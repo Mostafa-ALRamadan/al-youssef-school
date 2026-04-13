@@ -236,7 +236,7 @@ export default function AdminUsersPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardContent className="py-4 text-center">
               <div className="text-2xl font-bold">{users.length}</div>
@@ -270,7 +270,7 @@ export default function AdminUsersPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-4">
+        <div className="flex gap-4 mb-6">
           <div className="relative flex-1">
             <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
             <Input

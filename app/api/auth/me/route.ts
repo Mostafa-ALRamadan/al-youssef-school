@@ -29,15 +29,17 @@ export async function GET(request: NextRequest) {
       .from('users')
       .select(`
         *,
-        teachers(*, classes(name)),
+        teachers(*),
         parents(*)
       `)
       .eq('id', user.id)
       .single();
 
     if (userError || !userData) {
+      console.error('User query error:', userError);
+      console.error('User ID:', user.id);
       return NextResponse.json(
-        { error: 'User not found' },
+        { error: 'User not found', details: userError?.message },
         { status: 404 }
       );
     }
