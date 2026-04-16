@@ -78,9 +78,30 @@ export function Sidebar({ items, userRole, isMainAdmin }: SidebarProps) {
   });
 
   const handleLogout = async () => {
-    const { createClient } = await import('@/lib/supabase');
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    try {
+      const { createClient } = await import('@/lib/supabase');
+      const supabase = createClient();
+      
+      // Get current session for the API call
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Call API to clear admin session tracking
+      if (session?.access_token) {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        });
+      }
+      
+      // Sign out from Supabase client
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    
     window.location.href = '/login';
   };
 

@@ -2,7 +2,6 @@ import { supabase } from '@/lib/supabase-server';
 import type { Parent, TeacherAssignment, WeeklySchedule, TimeSlot, AttendanceSession, AttendanceRecord } from '@/types';
 import type { User, DashboardStats, Grade, Announcement, Complaint } from '@/types';
 import {
-  UserRepository,
   StudentRepository,
   ParentRepository,
   TeacherRepository,

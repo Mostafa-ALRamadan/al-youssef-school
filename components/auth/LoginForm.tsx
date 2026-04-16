@@ -7,8 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { SCHOOL_NAME, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/constants';
-import { AuthService } from '@/services/auth';
+import { SCHOOL_NAME, ERROR_MESSAGES } from '@/constants';
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -26,9 +25,30 @@ export function LoginForm() {
     setError('');
 
     try {
-      const data = await AuthService.login(email, password);
+      // Call API route for login (enables single-session enforcement for admins)
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || ERROR_MESSAGES.AUTH.INVALID_CREDENTIALS);
+        setLoading(false);
+        return;
+      }
+
+      // Set the Supabase session in the client
+      if (data.session) {
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+      }
       
-      // Try to get role from metadata first, then fall back to database
+      // Get role from the returned user data
       let role = data.user?.user_metadata?.role;
       
       // If no role in metadata, check the users table

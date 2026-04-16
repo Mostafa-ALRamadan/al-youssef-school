@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL UNIQUE,
     role user_role NOT NULL DEFAULT 'parent',
     is_main_admin BOOLEAN DEFAULT false,
+    active_session_id TEXT, -- For admin single-device enforcement
+    last_login_at TIMESTAMP WITH TIME ZONE, -- Last successful login timestamp
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
@@ -36,6 +38,8 @@ CREATE TABLE IF NOT EXISTS users (
 COMMENT ON TABLE users IS 'Extended user information for the school system';
 COMMENT ON COLUMN users.role IS 'User role: admin, teacher, or parent';
 COMMENT ON COLUMN users.is_main_admin IS 'Whether this admin is the main/super admin with full privileges';
+COMMENT ON COLUMN users.active_session_id IS 'Current active session ID for admin single-device enforcement';
+COMMENT ON COLUMN users.last_login_at IS 'Timestamp of last successful login for session validation';
 
 -- ============================================================================
 -- 3. PARENTS TABLE / جدول أولياء الأمور
@@ -323,8 +327,7 @@ COMMENT ON TABLE subject_content IS 'Educational content uploaded by teachers';
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
-CREATE INDEX IF NOT EXISTS idx_users_login_name ON users(login_name);
-CREATE INDEX IF NOT EXISTS idx_users_auth_email ON users(auth_email);
+CREATE INDEX IF NOT EXISTS idx_users_active_session ON users(active_session_id) WHERE active_session_id IS NOT NULL;
 
 -- Parents indexes
 CREATE INDEX IF NOT EXISTS idx_parents_user_id ON parents(user_id);
