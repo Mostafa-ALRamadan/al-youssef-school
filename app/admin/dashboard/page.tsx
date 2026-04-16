@@ -30,7 +30,7 @@ async function getDashboardStats() {
       totalClasses: 0,
       attendanceRate: 0,
       pendingPayments: 0,
-      newSuggestions: 0,
+      newComplaints: 0,
     };
   }
 }
@@ -89,8 +89,8 @@ export default async function AdminDashboardPage() {
           trendValue={`${formatNumber(5)}%`}
         />
         <StatCard
-          title="اقتراحات جديدة"
-          value={formatNumber(stats.newSuggestions)}
+          title="شكاوى جديدة"
+          value={formatNumber(stats.newComplaints)}
           icon={<MessageSquare className="h-5 w-5" />}
           description="بانتظار المراجعة"
         />

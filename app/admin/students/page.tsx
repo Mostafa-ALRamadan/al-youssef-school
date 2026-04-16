@@ -60,7 +60,6 @@ export default function StudentsPage() {
     name: '',
     class_id: '',
     parent_name: '',
-    parent_email: '',
     parent_password: '',
     parent_phone: '',
     parent_address: '',
@@ -118,7 +117,7 @@ export default function StudentsPage() {
 
       if (response.ok) {
         setIsAddDialogOpen(false);
-        setFormData({ name: '', class_id: '', parent_name: '', parent_email: '', parent_password: '', parent_phone: '', parent_address: '', date_of_birth: '', gender: '' });
+        setFormData({ name: '', class_id: '', parent_name: '', parent_password: '', parent_phone: '', parent_address: '', date_of_birth: '', gender: '' });
         fetchStudents();
       } else {
         console.error('Error:', data.error);
@@ -178,7 +177,6 @@ export default function StudentsPage() {
       name: student.name,
       class_id: student.class_id || '',
       parent_name: student.parent_name || '',
-      parent_email: student.parent_email || '',
       parent_password: '',
       parent_phone: student.parent_phone || '',
       parent_address: student.parent_address || '',
@@ -219,7 +217,6 @@ export default function StudentsPage() {
     setFormData({
       ...formData,
       parent_name: parent.parent_name || '',
-      parent_email: parent.parent_email || '',
       parent_phone: parent.parent_phone || '',
       parent_address: parent.parent_address || '',
       parent_password: '',
@@ -252,7 +249,7 @@ export default function StudentsPage() {
               setIsAddDialogOpen(true);
               setIsExistingParent(false);
               setParentSearch('');
-              setFormData({ name: '', class_id: '', parent_name: '', parent_email: '', parent_password: '', parent_phone: '', parent_address: '', date_of_birth: '', gender: '' });
+              setFormData({ name: '', class_id: '', parent_name: '', parent_password: '', parent_phone: '', parent_address: '', date_of_birth: '', gender: '' });
             }}
             >
               <Plus className="h-4 w-4 ml-2" />
@@ -336,17 +333,6 @@ export default function StudentsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="parent_email">البريد الإلكتروني لولي الأمر</Label>
-                  <Input
-                    id="parent_email"
-                    type="email"
-                    value={formData.parent_email}
-                    onChange={(e) => setFormData({ ...formData, parent_email: e.target.value })}
-                    placeholder="أدخل البريد الإلكتروني"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="parent_password">كلمة المرور لولي الأمر {isExistingParent && '(اختياري - ولي أمر موجود)'}</Label>
                   <Input
                     id="parent_password"
@@ -417,7 +403,7 @@ export default function StudentsPage() {
                   <TableHead className="text-center px-4 py-3">اسم الطالب</TableHead>
                   <TableHead className="text-center px-4 py-3">الصف</TableHead>
                   <TableHead className="text-center px-4 py-3">اسم ولي الأمر</TableHead>
-                  <TableHead className="text-center px-4 py-3">البريد الإلكتروني</TableHead>
+                  <TableHead className="text-center px-4 py-3">اسم الدخول (للتطبيق)</TableHead>
                   <TableHead className="text-center px-4 py-3">رقم الهاتف</TableHead>
                   <TableHead className="text-center px-4 py-3">العنوان</TableHead>
                   <TableHead className="text-center px-4 py-3">الجنس</TableHead>
@@ -439,7 +425,7 @@ export default function StudentsPage() {
                       <TableCell className="text-center px-4 py-3 font-medium">{student.name}</TableCell>
                       <TableCell className="text-center px-4 py-3">{student.class_name || '-'}</TableCell>
                       <TableCell className="text-center px-4 py-3">{student.parent_name || '-'}</TableCell>
-                      <TableCell className="text-center px-4 py-3">{student.parent_email || '-'}</TableCell>
+                      <TableCell className="text-center px-4 py-3">{student.login_name || '-'}</TableCell>
                       <TableCell className="text-center px-4 py-3">{student.parent_phone ? formatPhoneNumber(student.parent_phone) : '-'}</TableCell>
                       <TableCell className="text-center px-4 py-3">{student.parent_address || '-'}</TableCell>
                       <TableCell className="text-center px-4 py-3">{student.gender === 'male' ? 'ذكر' : student.gender === 'female' ? 'أنثى' : '-'}</TableCell>
@@ -537,15 +523,6 @@ export default function StudentsPage() {
                   value={formData.parent_name}
                   onChange={(e) => setFormData({ ...formData, parent_name: e.target.value })}
                   required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-parent_email">البريد الإلكتروني لولي الأمر</Label>
-                <Input
-                  id="edit-parent_email"
-                  type="email"
-                  value={formData.parent_email}
-                  onChange={(e) => setFormData({ ...formData, parent_email: e.target.value })}
                 />
               </div>
               <div className="space-y-2">

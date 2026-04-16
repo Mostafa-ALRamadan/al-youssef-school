@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase-server';
 
-// GET /api/suggestions - Get all suggestions (admin only)
+// GET /api/complaints - Get all complaints (admin only)
 export async function GET(request: NextRequest) {
   try {
         
@@ -17,23 +17,23 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Get suggestions without user join for now
-    const { data: suggestions, error } = await supabase
-      .from('suggestions')
+    // Get complaints without user join for now
+    const { data: complaints, error } = await supabase
+      .from('complaints')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching suggestions:', error);
+      console.error('Error fetching complaints:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Return suggestions as-is for now
-    const transformedSuggestions = suggestions || [];
+    // Return complaints as-is for now
+    const transformedComplaints = complaints || [];
 
-    return NextResponse.json({ suggestions: transformedSuggestions });
+    return NextResponse.json({ complaints: transformedComplaints });
   } catch (error) {
-    console.error('GET /api/suggestions error:', error);
+    console.error('GET /api/complaints error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/suggestions - Submit new suggestion (authenticated users only)
+// POST /api/complaints - Submit new complaint (authenticated users only)
 export async function POST(request: NextRequest) {
   try {
         
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
-        { error: 'يجب تسجيل الدخول لإرسال اقتراح' },
+        { error: 'يجب تسجيل الدخول لإرسال شكوى' },
         { status: 401 }
       );
     }
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'يجب تسجيل الدخول لإرسال اقتراح' },
+        { error: 'يجب تسجيل الدخول لإرسال شكوى' },
         { status: 401 }
       );
     }
@@ -76,11 +76,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate limiting: Check today's suggestions for this user
+    // Rate limiting: Check today's complaints for this user
     const today = new Date().toISOString().split('T')[0];
     
-    const { data: existingSuggestions, error: countError } = await supabase
-      .from('suggestions')
+    const { data: existingComplaints, error: countError } = await supabase
+      .from('complaints')
       .select('id')
       .eq('user_id', user.id)
       .gte('created_at', `${today}T00:00:00.000Z`)
@@ -95,16 +95,16 @@ export async function POST(request: NextRequest) {
     }
     
     // Check rate limit (max 3 per day)
-    if (existingSuggestions && existingSuggestions.length >= 3) {
+    if (existingComplaints && existingComplaints.length >= 3) {
       return NextResponse.json(
-        { error: 'لقد وصلت إلى الحد الأقصى من الاقتراحات لهذا اليوم. يمكنك إرسال 3 اقتراحات فقط يومياً.' },
+        { error: 'لقد وصلت إلى الحد الأقصى من الشكاوى لهذا اليوم. يمكنك إرسال 3 شكاوى فقط يومياً.' },
         { status: 429 }
       );
     }
 
-    // Create suggestion
-    const { data: suggestion, error: createError } = await supabase
-      .from('suggestions')
+    // Create complaint
+    const { data: complaint, error: createError } = await supabase
+      .from('complaints')
       .insert({
         user_id: user.id,
         title: body.title,
@@ -114,19 +114,19 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (createError) {
-      console.error('Error creating suggestion:', createError);
+      console.error('Error creating complaint:', createError);
       return NextResponse.json(
-        { error: createError.message || 'Failed to create suggestion' },
+        { error: createError.message || 'Failed to create complaint' },
         { status: 500 }
       );
     }
 
     return NextResponse.json(
-      { message: 'تم إرسال الاقتراح بنجاح', suggestion },
+      { message: 'تم إرسال الشكوى بنجاح', complaint },
       { status: 201 }
     );
   } catch (error: any) {
-    console.error('POST /api/suggestions error:', error);
+    console.error('POST /api/complaints error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

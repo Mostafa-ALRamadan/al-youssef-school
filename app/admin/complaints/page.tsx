@@ -9,41 +9,42 @@ import { useToast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Lightbulb, Trash2, MessageSquare, Reply, Eye } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { MainAdminGuard } from '@/components/auth/MainAdminGuard';
 import { ADMIN_SIDEBAR_ITEMS, USER_ROLES } from '@/constants';
 import { createClient } from '@/lib/supabase';
-import type { Suggestion } from '@/types';
+import type { Complaint } from '@/types';
 import { formatDate } from '@/utils/date';
 
-export default function AdminSuggestionsPage() {
+export default function AdminComplaintsPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
-  const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null);
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
 
   useEffect(() => {
-    loadSuggestions();
+    loadComplaints();
   }, []);
 
-  const loadSuggestions = async () => {
+  const loadComplaints = async () => {
     try {
-      const response = await fetch('/api/suggestions');
+      const response = await fetch('/api/complaints');
       if (response.ok) {
         const data = await response.json();
-        setSuggestions(data.suggestions || []);
+        setComplaints(data.complaints || []);
       }
     } catch (error) {
-      console.error('Error loading suggestions:', error);
+      console.error('Error loading complaints:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStatusChange = async (id: string, status: Suggestion['status']) => {
+  const handleStatusChange = async (id: string, status: Complaint['status']) => {
     try {
-      const response = await fetch(`/api/suggestions/${id}`, {
+      const response = await fetch(`/api/complaints/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -52,9 +53,9 @@ export default function AdminSuggestionsPage() {
       if (response.ok) {
         toast({
           title: 'تم بنجاح',
-          description: 'تم تحديث حالة الاقتراح',
+          description: 'تم تحديث حالة الشكوى',
         });
-        loadSuggestions();
+        loadComplaints();
       } else {
         const error = await response.json();
         toast({
@@ -69,19 +70,19 @@ export default function AdminSuggestionsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الاقتراح؟')) return;
+    if (!confirm('هل أنت متأكد من حذف هذه الشكوى؟')) return;
 
     try {
-      const response = await fetch(`/api/suggestions/${id}`, {
+      const response = await fetch(`/api/complaints/${id}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
         toast({
           title: 'تم بنجاح',
-          description: 'تم حذف الاقتراح',
+          description: 'تم حذف الشكوى',
         });
-        loadSuggestions();
+        loadComplaints();
       } else {
         const error = await response.json();
         toast({
@@ -91,7 +92,7 @@ export default function AdminSuggestionsPage() {
         });
       }
     } catch (error) {
-      console.error('Error deleting suggestion:', error);
+      console.error('Error deleting complaint:', error);
     }
   };
 
@@ -116,11 +117,11 @@ export default function AdminSuggestionsPage() {
   };
 
   const handleReply = async () => {
-    if (!selectedSuggestion || !replyText.trim()) return;
+    if (!selectedComplaint || !replyText.trim()) return;
 
     setSubmittingReply(true);
     try {
-      const response = await fetch(`/api/suggestions/${selectedSuggestion.id}`, {
+      const response = await fetch(`/api/complaints/${selectedComplaint.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reply: replyText.trim() }),
@@ -133,8 +134,8 @@ export default function AdminSuggestionsPage() {
         });
         setReplyDialogOpen(false);
         setReplyText('');
-        setSelectedSuggestion(null);
-        loadSuggestions();
+        setSelectedComplaint(null);
+        loadComplaints();
       } else {
         const error = await response.json();
         toast({
@@ -155,22 +156,23 @@ export default function AdminSuggestionsPage() {
     }
   };
 
-  const openReplyDialog = (suggestion: Suggestion) => {
-    setSelectedSuggestion(suggestion);
-    setReplyText(suggestion.reply || '');
+  const openReplyDialog = (complaint: Complaint) => {
+    setSelectedComplaint(complaint);
+    setReplyText(complaint.reply || '');
     setReplyDialogOpen(true);
   };
 
   return (
-    <DashboardLayout sidebarItems={ADMIN_SIDEBAR_ITEMS} userRole={USER_ROLES.ADMIN}>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <MessageSquare className="h-8 w-8 text-brand-primary-blue" />
-          <h1 className="text-2xl font-bold">الاقتراحات</h1>
+    <MainAdminGuard>
+      <DashboardLayout sidebarItems={ADMIN_SIDEBAR_ITEMS} userRole={USER_ROLES.ADMIN}>
+        <div className="p-6 space-y-6">
+          {/* Header */}
+          <div className="flex items-center gap-3">
+            <MessageSquare className="h-8 w-8 text-brand-primary-blue" />
+          <h1 className="text-2xl font-bold">صندوق الشكاوي</h1>
         </div>
 
-        {/* Suggestions List */}
+        {/* Complaints List */}
         {loading ? (
           <div className="text-center py-8">جاري التحميل...</div>
         ) : (
@@ -178,13 +180,13 @@ export default function AdminSuggestionsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Lightbulb className="h-5 w-5" />
-                قائمة الاقتراحات
+                قائمة الشكاوي
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {suggestions.length === 0 ? (
+              {complaints.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  لا توجد اقتراحات
+                  لا توجد شكاوي
                 </div>
               ) : (
                 <Table>
@@ -198,19 +200,19 @@ export default function AdminSuggestionsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {suggestions.map((suggestion) => (
-                      <TableRow key={suggestion.id}>
-                        <TableCell className="font-medium">{suggestion.title}</TableCell>
-                        <TableCell className="max-w-md truncate">{suggestion.message}</TableCell>
+                    {complaints.map((complaint) => (
+                      <TableRow key={complaint.id}>
+                        <TableCell className="font-medium">{complaint.title}</TableCell>
+                        <TableCell className="max-w-md truncate">{complaint.message}</TableCell>
                         <TableCell>
                           <Select
-                            value={suggestion.status}
-                            onValueChange={(value) => handleStatusChange(suggestion.id, value as Suggestion['status'])}
+                            value={complaint.status}
+                            onValueChange={(value) => handleStatusChange(complaint.id, value as Complaint['status'])}
                           >
                             <SelectTrigger dir="rtl" className="w-32">
                               <SelectValue>
-                                <span className={`px-2 py-1 rounded text-xs ${getStatusColor(suggestion.status)}`}>
-                                  {getStatusLabel(suggestion.status)}
+                                <span className={`px-2 py-1 rounded text-xs ${getStatusColor(complaint.status)}`}>
+                                  {getStatusLabel(complaint.status)}
                                 </span>
                               </SelectValue>
                             </SelectTrigger>
@@ -223,22 +225,22 @@ export default function AdminSuggestionsPage() {
                           </Select>
                         </TableCell>
                         <TableCell>
-                          {formatDate(suggestion.created_at)}
+                          {formatDate(complaint.created_at)}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => openReplyDialog(suggestion)}
-                              title={suggestion.reply ? 'عرض/تعديل الرد' : 'إضافة رد'}
+                              onClick={() => openReplyDialog(complaint)}
+                              title={complaint.reply ? 'عرض/تعديل الرد' : 'إضافة رد'}
                             >
-                              <Reply className={`h-4 w-4 ${suggestion.reply ? 'text-green-600' : 'text-blue-600'}`} />
+                              <Reply className={`h-4 w-4 ${complaint.reply ? 'text-green-600' : 'text-blue-600'}`} />
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleDelete(suggestion.id)}
+                              onClick={() => handleDelete(complaint.id)}
                             >
                               <Trash2 className="h-4 w-4 text-red-600" />
                             </Button>
@@ -259,16 +261,16 @@ export default function AdminSuggestionsPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Reply className="h-5 w-5" />
-                {selectedSuggestion?.reply ? 'تعديل الرد' : 'إضافة رد'}
+                {selectedComplaint?.reply ? 'تعديل الرد' : 'إضافة رد'}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              {selectedSuggestion && (
+              {selectedComplaint && (
                 <>
                   <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm text-gray-600 mb-1">الاقتراح:</p>
-                    <p className="font-medium">{selectedSuggestion.title}</p>
-                    <p className="text-sm text-gray-600 mt-1">{selectedSuggestion.message}</p>
+                    <p className="text-sm text-gray-600 mb-1">الشكوى:</p>
+                    <p className="font-medium">{selectedComplaint.title}</p>
+                    <p className="text-sm text-gray-600 mt-1">{selectedComplaint.message}</p>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium block mb-2">الرد:</label>
@@ -293,7 +295,7 @@ export default function AdminSuggestionsPage() {
                       disabled={!replyText.trim() || submittingReply}
                       className="bg-brand-primary-blue hover:bg-brand-dark-blue"
                     >
-                      {submittingReply ? 'جاري الإرسال...' : (selectedSuggestion.reply ? 'تحديث الرد' : 'إرسال الرد')}
+                      {submittingReply ? 'جاري الإرسال...' : (selectedComplaint.reply ? 'تحديث الرد' : 'إرسال الرد')}
                     </Button>
                   </div>
                 </>
@@ -301,7 +303,8 @@ export default function AdminSuggestionsPage() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
+    </MainAdminGuard>
   );
 }

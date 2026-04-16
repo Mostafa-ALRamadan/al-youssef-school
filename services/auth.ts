@@ -15,6 +15,31 @@ export class AuthService {
     return data;
   }
 
+  /**
+   * Parent login using student login_name + parent password
+   * @param studentLoginName - Student's triple name (e.g., "عمر علي عبده")
+   * @param password - Parent's password
+   */
+  static async parentLogin(studentLoginName: string, password: string) {
+    // Call the API endpoint instead of direct repository access
+    const response = await fetch('/api/auth/parent-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_login_name: studentLoginName,
+        password,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'فشل تسجيل الدخول');
+    }
+
+    return data;
+  }
+
   static async logout() {
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
     const { error } = await supabaseClient.auth.signOut();

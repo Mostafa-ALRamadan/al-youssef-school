@@ -8,7 +8,7 @@ import type {
   Announcement,
   Payment,
   Schedule,
-  Suggestion,
+  Complaint,
   DashboardStats,
   Parent,
   TeacherAssignment,
@@ -84,27 +84,11 @@ export class StudentRepository {
       return [];
     }
     
-    // Get unique user_ids from parents to fetch emails
-    const userIds = [...new Set((data || []).map((s: any) => s.parents?.user_id).filter(Boolean))];
-    
-    let userEmails: Record<string, string> = {};
-    if (userIds.length > 0) {
-      const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('id, email')
-        .in('id', userIds);
-      
-      if (!usersError && usersData) {
-        userEmails = Object.fromEntries(usersData.map((u: any) => [u.id, u.email]));
-      }
-    }
-    
     // Transform the nested data to flat structure
     return (data || []).map((student: any) => ({
       ...student,
       class_name: student.classes?.name,
       parent_name: student.parents?.name,
-      parent_email: userEmails[student.parents?.user_id],
       parent_phone: student.parents?.phone,
       parent_address: student.parents?.address,
     })) as unknown as Student[];
@@ -166,30 +150,38 @@ export class StudentRepository {
       return [];
     }
     
-    // Get unique user_ids from parents to fetch emails
-    const userIds = [...new Set((data || []).map((s: any) => s.parents?.user_id).filter(Boolean))];
-    
-    let userEmails: Record<string, string> = {};
-    if (userIds.length > 0) {
-      const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('id, email')
-        .in('id', userIds);
-      
-      if (!usersError && usersData) {
-        userEmails = Object.fromEntries(usersData.map((u: any) => [u.id, u.email]));
-      }
-    }
-    
-    // Transform the nested data to flat structure
     return (data || []).map((student: any) => ({
       ...student,
       class_name: student.classes?.name,
       parent_name: student.parents?.name,
-      parent_email: userEmails[student.parents?.user_id],
       parent_phone: student.parents?.phone,
       parent_address: student.parents?.address,
     })) as unknown as Student[];
+  }
+
+  static async findByLoginName(loginName: string): Promise<Student | null> {
+    const { data, error } = await supabase
+      .from('students')
+      .select(`
+        *,
+        classes(name),
+        parents(id, name, phone, address, user_id, auth_email)
+      `)
+      .eq('login_name', loginName)
+      .single();
+    
+    if (error) {
+      console.error('Student findByLoginName error:', error);
+      return null;
+    }
+    
+    return {
+      ...data,
+      class_name: data.classes?.name,
+      parent_name: data.parents?.name,
+      parent_phone: data.parents?.phone,
+      parent_address: data.parents?.address,
+    } as unknown as Student;
   }
 
   static async create(student: Partial<Student>): Promise<Student | null> {
@@ -267,8 +259,8 @@ export class ParentRepository {
   }
 
   static async create(
-    parent: Omit<Parent, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
-    email: string,
+    parent: Omit<Parent, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'auth_email'>,
+    authEmail: string,
     password: string,
     existingUserId?: string
   ): Promise<Parent | null> {
@@ -276,9 +268,9 @@ export class ParentRepository {
     
     // Only create auth user if userId not provided
     if (!userId) {
-      // First create auth user using admin API
+      // First create auth user using admin API with hidden auth_email
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: email,
+        email: authEmail,
         password: password,
         email_confirm: true,
       });
@@ -296,7 +288,7 @@ export class ParentRepository {
         .from('users')
         .insert({
           id: userId,
-          email: email,
+          email: authEmail,
           role: 'parent'
         });
       
@@ -306,12 +298,13 @@ export class ParentRepository {
       }
     }
     
-    // Now create the parent with the user_id
+    // Now create the parent with the user_id and auth_email
     const { data, error } = await supabase
       .from('parents')
       .insert({
         ...parent,
-        user_id: userId
+        user_id: userId,
+        auth_email: authEmail,
       })
       .select()
       .single();
@@ -1127,13 +1120,13 @@ export class TimeSlotRepository {
 
 export class DashboardRepository {
   static async getStats(): Promise<DashboardStats> {
-    const [totalStudents, totalTeachers, totalClasses, pendingPayments, newSuggestions] = 
+    const [totalStudents, totalTeachers, totalClasses, pendingPayments, newComplaints] = 
       await Promise.all([
         StudentRepository.count(),
         TeacherRepository.count(),
         ClassRepository.count(),
         PaymentRepository.countPending(),
-        SuggestionRepository.countNew(),
+        ComplaintRepository.countNew(),
       ]);
 
     const attendanceRate = await AttendanceRepository.getTodayAttendanceRate();
@@ -1144,7 +1137,7 @@ export class DashboardRepository {
       totalClasses,
       attendanceRate,
       pendingPayments,
-      newSuggestions,
+      newComplaints,
     };
   }
 }
@@ -1441,10 +1434,10 @@ export class AnnouncementRepository {
   }
 }
 
-export class SuggestionRepository {
-  static async findAll(): Promise<Suggestion[]> {
+export class ComplaintRepository {
+  static async findAll(): Promise<Complaint[]> {
     const { data, error } = await supabase
-      .from('suggestions')
+      .from('complaints')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -1455,9 +1448,9 @@ export class SuggestionRepository {
     return data || [];
   }
 
-  static async findById(id: string): Promise<Suggestion | null> {
+  static async findById(id: string): Promise<Complaint | null> {
     const { data, error } = await supabase
-      .from('suggestions')
+      .from('complaints')
       .select('*')
       .eq('id', id)
       .single();
@@ -1466,15 +1459,15 @@ export class SuggestionRepository {
       console.error('findById error:', error);
       return null;
     }
-    return data as Suggestion;
+    return data as Complaint;
   }
 
-  static async create(suggestion: Omit<Suggestion, 'id' | 'created_at' | 'status'>): Promise<Suggestion | null> {
+  static async create(complaint: Omit<Complaint, 'id' | 'created_at' | 'status'>): Promise<Complaint | null> {
     const { data, error } = await supabase
-      .from('suggestions')
+      .from('complaints')
       .insert({
-        title: suggestion.title,
-        message: suggestion.message,
+        title: complaint.title,
+        message: complaint.message,
         status: 'pending',
       })
       .select()
@@ -1484,12 +1477,12 @@ export class SuggestionRepository {
       console.error('create error:', error);
       return null;
     }
-    return data as Suggestion;
+    return data as Complaint;
   }
 
-  static async updateStatus(id: string, status: Suggestion['status']): Promise<Suggestion | null> {
+  static async updateStatus(id: string, status: Complaint['status']): Promise<Complaint | null> {
     const { data, error } = await supabase
-      .from('suggestions')
+      .from('complaints')
       .update({ status })
       .eq('id', id)
       .select()
@@ -1499,12 +1492,12 @@ export class SuggestionRepository {
       console.error('updateStatus error:', error);
       return null;
     }
-    return data as Suggestion;
+    return data as Complaint;
   }
 
   static async delete(id: string): Promise<boolean> {
     const { error } = await supabase
-      .from('suggestions')
+      .from('complaints')
       .delete()
       .eq('id', id);
 
@@ -1515,9 +1508,9 @@ export class SuggestionRepository {
     return true;
   }
 
-  static async addReply(id: string, reply: string, replied_by?: string): Promise<Suggestion | null> {
+  static async addReply(id: string, reply: string, replied_by?: string): Promise<Complaint | null> {
     const { data, error } = await supabase
-      .from('suggestions')
+      .from('complaints')
       .update({
         reply,
         replied_at: new Date().toISOString(),
@@ -1532,12 +1525,12 @@ export class SuggestionRepository {
       console.error('addReply error:', error);
       return null;
     }
-    return data as Suggestion;
+    return data as Complaint;
   }
 
   static async countNew(): Promise<number> {
     const { count, error } = await supabase
-      .from('suggestions')
+      .from('complaints')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
 

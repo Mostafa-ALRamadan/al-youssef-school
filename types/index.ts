@@ -4,7 +4,7 @@ export type DayOfWeek = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursda
 export type EvaluationType = 'behavior' | 'participation' | 'effort' | 'attitude' | 'other';
 export type ExamType = 'quiz' | 'homework' | 'midterm' | 'final' | 'project';
 export type SenderType = 'parent' | 'teacher' | 'student' | 'other';
-export type SuggestionStatus = 'pending' | 'reviewed' | 'implemented' | 'rejected';
+export type ComplaintStatus = 'pending' | 'reviewed' | 'implemented' | 'rejected';
 
 export interface User {
   id: string;
@@ -21,6 +21,7 @@ export interface Parent {
   name: string;
   phone: string;
   address?: string;
+  auth_email?: string; // Internal hidden email for Supabase Auth
   created_at: string;
   updated_at: string;
 }
@@ -49,6 +50,7 @@ export interface Class {
 export interface Student {
   id: string;
   name: string;
+  login_name?: string; // Unique triple name for parent login (e.g., عمر علي عبده)
   class_id?: string;
   parent_id?: string;
   date_of_birth?: string;
@@ -58,7 +60,6 @@ export interface Student {
   // Joined data for UI display
   class_name?: string;
   parent_name?: string;
-  parent_email?: string;
   parent_phone?: string;
   parent_address?: string;
 }
@@ -189,7 +190,7 @@ export interface DashboardStats {
   totalClasses: number;
   attendanceRate: number;
   pendingPayments: number;
-  newSuggestions: number;
+  newComplaints: number;
 }
 
 // Grades System Types
@@ -236,7 +237,7 @@ export interface Announcement {
   created_by_name?: string;
 }
 
-export interface Suggestion {
+export interface Complaint {
   id: string;
   user_id?: string;
   title: string;

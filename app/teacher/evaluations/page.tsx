@@ -33,18 +33,18 @@ interface Class {
 
 const RATING_LABELS: Record<number, string> = {
   1: 'ضعيف',
-  2: 'مقبول',
+  2: 'وسط',
   3: 'جيد',
   4: 'جيد جداً',
   5: 'ممتاز',
 };
 
 const RATING_COLORS: Record<number, string> = {
-  1: 'bg-red-500 text-white',
-  2: 'bg-orange-500 text-white',
-  3: 'bg-yellow-500 text-white',
-  4: 'bg-blue-500 text-white',
-  5: 'bg-green-500 text-white',
+  1: 'bg-red-100 text-red-800',
+  2: 'bg-orange-100 text-orange-800',
+  3: 'bg-yellow-100 text-yellow-800',
+  4: 'bg-blue-100 text-blue-800',
+  5: 'bg-green-100 text-green-800',
 };
 
 const RATING_BADGE_COLORS: Record<number, string> = {

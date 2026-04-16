@@ -26,7 +26,7 @@ export const SIDEBAR_ITEMS = [
   { id: 'grades', label: 'العلامات', icon: 'Award', href: '/admin/grades' },
   { id: 'fees', label: 'الأقساط', icon: 'CreditCard', href: '/admin/fees' },
   { id: 'schedule', label: 'البرنامج الأسبوعي', icon: 'Calendar', href: '/admin/schedule' },
-  { id: 'suggestions', label: 'الاقتراحات', icon: 'MessageSquare', href: '/admin/suggestions' },
+  { id: 'complaints', label: 'صندوق الشكاوي', icon: 'MessageSquare', href: '/admin/complaints', requiresMainAdmin: true },
   { id: 'evaluations', label: 'تقييم الطلاب', icon: 'Star', href: '/admin/evaluations' },
   { id: 'users', label: 'المستخدمين', icon: 'Users', href: '/admin/users' },
   { id: 'settings', label: 'إعدادات النظام', icon: 'Settings', href: '/admin/settings', requiresMainAdmin: true },
@@ -89,9 +89,9 @@ export const API_ROUTES = {
     BASE: '/api/schedule',
     BY_ID: (id: string) => `/api/schedule/${id}`,
   },
-  SUGGESTIONS: {
-    BASE: '/api/suggestions',
-    BY_ID: (id: string) => `/api/suggestions/${id}`,
+  COMPLAINTS: {
+    BASE: '/api/complaints',
+    BY_ID: (id: string) => `/api/complaints/${id}`,
   },
 } as const;
 

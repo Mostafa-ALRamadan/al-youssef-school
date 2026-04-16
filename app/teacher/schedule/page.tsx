@@ -91,7 +91,7 @@ export default function TeacherSchedulePage() {
         {/* Page Header */}
         <div className="flex items-center gap-3 mb-6">
           <Calendar className="h-8 w-8 text-brand-primary-blue" />
-          <h1 className="text-2xl font-bold">جدولي الأسبوعي</h1>
+          <h1 className="text-2xl font-bold">البرنامج</h1>
         </div>
 
         {loading ? (

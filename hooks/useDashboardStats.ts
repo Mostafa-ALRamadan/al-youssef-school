@@ -9,7 +9,7 @@ export function useDashboardStats() {
     totalClasses: 0,
     attendanceRate: 0,
     pendingPayments: 0,
-    newSuggestions: 0,
+    newComplaints: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

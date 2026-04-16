@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase-server';
 import type { Parent, TeacherAssignment, WeeklySchedule, TimeSlot, AttendanceSession, AttendanceRecord } from '@/types';
-import type { User, DashboardStats, Grade, Announcement, Suggestion } from '@/types';
+import type { User, DashboardStats, Grade, Announcement, Complaint } from '@/types';
 import {
   UserRepository,
   StudentRepository,
@@ -13,7 +13,7 @@ import {
   GradeRepository,
   PaymentRepository,
   ScheduleRepository,
-  SuggestionRepository,
+  ComplaintRepository,
   DashboardRepository,
   TeacherAssignmentRepository,
   WeeklyScheduleRepository,
@@ -89,7 +89,6 @@ export class StudentService {
     name: string; 
     class_id: string; 
     parent_name: string; 
-    parent_email: string;
     parent_password?: string;
     parent_phone: string;
     parent_address?: string;
@@ -100,56 +99,53 @@ export class StudentService {
     let parent = await ParentRepository.findByPhone(studentData.parent_phone);
     
     if (!parent) {
-      // Check if a user already exists with this email in the users table
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id, email')
-        .eq('email', studentData.parent_email)
-        .single();
+      // Generate a hidden auth_email for the parent
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 8);
+      const authEmail = `parent_${timestamp}_${randomStr}@alyoussef.local`;
       
-      if (existingUser) {
-        // User exists, find parent by user_id
-        const { data: existingParent } = await supabase
-          .from('parents')
-          .select('*')
-          .eq('user_id', existingUser.id)
-          .single();
-        
-        if (existingParent) {
-          parent = existingParent as Parent;
-        } else {
-          // User exists but no parent record - create parent record with existing user_id
-          parent = await ParentRepository.create(
-            {
-              name: studentData.parent_name,
-              phone: studentData.parent_phone,
-              address: studentData.parent_address,
-            },
-            studentData.parent_email,
-            studentData.parent_password || '',
-            existingUser.id
-          );
-        }
-      } else {
-        // No user exists, create new parent with auth user
-        parent = await ParentRepository.create(
-          {
-            name: studentData.parent_name,
-            phone: studentData.parent_phone,
-            address: studentData.parent_address,
-          },
-          studentData.parent_email,
-          studentData.parent_password || ''
-        );
-      }
+      // Create new parent with auth user
+      parent = await ParentRepository.create(
+        {
+          name: studentData.parent_name,
+          phone: studentData.parent_phone,
+          address: studentData.parent_address,
+        },
+        authEmail,
+        studentData.parent_password || ''
+      );
     }
 
     if (!parent) {
       throw new Error('فشل إنشاء أو العثور على ولي الأمر');
     }
 
+    // Generate login_name for the student (triple name format)
+    // Example: "عمر علي عبده" (student name + parent name components)
+    const parentNameParts = studentData.parent_name.trim().split(/\s+/);
+    const studentFirstName = studentData.name.trim().split(/\s+/)[0];
+    
+    // Create triple name: student first name + parent first name + parent last name (if available)
+    let loginName = studentData.name;
+    if (parentNameParts.length >= 2) {
+      loginName = `${studentFirstName} ${parentNameParts[0]} ${parentNameParts[parentNameParts.length - 1]}`;
+    } else if (parentNameParts.length === 1) {
+      loginName = `${studentFirstName} ${parentNameParts[0]}`;
+    }
+    
+    // Ensure uniqueness by appending a number if needed
+    let finalLoginName = loginName;
+    let counter = 1;
+    while (true) {
+      const existing = await StudentRepository.findByLoginName(finalLoginName);
+      if (!existing) break;
+      finalLoginName = `${loginName} ${counter}`;
+      counter++;
+    }
+
     const student = await StudentRepository.create({
       name: studentData.name,
+      login_name: finalLoginName,
       class_id: studentData.class_id,
       parent_id: parent.id,
       date_of_birth: studentData.date_of_birth,
@@ -163,7 +159,6 @@ export class StudentService {
     name?: string; 
     class_id?: string; 
     parent_name?: string; 
-    parent_email?: string;
     parent_password?: string;
     parent_phone?: string;
     parent_address?: string;
@@ -189,20 +184,6 @@ export class StudentService {
         // Phone belongs to a different parent - link student to this parent
         parentId = existingParent.id;
         parentChanged = true;
-        
-        // Optionally update email of the existing parent if provided
-        if (updates.parent_email && existingParent.user_id) {
-          await supabase
-            .from('users')
-            .update({ email: updates.parent_email })
-            .eq('id', existingParent.user_id);
-          
-          // Update auth user email
-          await supabase.auth.admin.updateUserById(
-            existingParent.user_id,
-            { email: updates.parent_email }
-          );
-        }
       } else if (existingParent && existingParent.id === student.parent_id) {
         // Same parent - update their info
         const parentUpdates: any = {};
@@ -211,14 +192,6 @@ export class StudentService {
         if (updates.parent_address) parentUpdates.address = updates.parent_address;
         
         await ParentRepository.update(existingParent.id, parentUpdates);
-        
-        if (updates.parent_email && existingParent.user_id) {
-          await supabase.auth.admin.updateUserById(
-            existingParent.user_id,
-            { email: updates.parent_email }
-          );
-          await supabase.from('users').update({ email: updates.parent_email }).eq('id', existingParent.user_id);
-        }
       } else if (!existingParent && currentParent) {
         // New phone number doesn't exist - update current parent's phone
         const parentUpdates: any = {};
@@ -227,14 +200,6 @@ export class StudentService {
         if (updates.parent_address) parentUpdates.address = updates.parent_address;
         
         await ParentRepository.update(currentParent.id, parentUpdates);
-        
-        if (updates.parent_email && currentParent.user_id) {
-          await supabase.auth.admin.updateUserById(
-            currentParent.user_id,
-            { email: updates.parent_email }
-          );
-          await supabase.from('users').update({ email: updates.parent_email }).eq('id', currentParent.user_id);
-        }
       }
     }
 
@@ -455,29 +420,29 @@ export class ScheduleService {
   }
 }
 
-export class SuggestionService {
-  static async getAllSuggestions(): Promise<Suggestion[]> {
-    return await SuggestionRepository.findAll();
+export class ComplaintService {
+  static async getAllComplaints(): Promise<Complaint[]> {
+    return await ComplaintRepository.findAll();
   }
 
-  static async getSuggestionById(id: string): Promise<Suggestion | null> {
-    return await SuggestionRepository.findById(id);
+  static async getComplaintById(id: string): Promise<Complaint | null> {
+    return await ComplaintRepository.findById(id);
   }
 
-  static async submitSuggestion(suggestion: Omit<Suggestion, 'id' | 'created_at' | 'status'>): Promise<Suggestion | null> {
-    return await SuggestionRepository.create(suggestion);
+  static async submitComplaint(complaint: Omit<Complaint, 'id' | 'created_at' | 'status'>): Promise<Complaint | null> {
+    return await ComplaintRepository.create(complaint);
   }
 
-  static async updateSuggestionStatus(id: string, status: Suggestion['status']): Promise<Suggestion | null> {
-    return await SuggestionRepository.updateStatus(id, status);
+  static async updateComplaintStatus(id: string, status: Complaint['status']): Promise<Complaint | null> {
+    return await ComplaintRepository.updateStatus(id, status);
   }
 
-  static async deleteSuggestion(id: string): Promise<boolean> {
-    return await SuggestionRepository.delete(id);
+  static async deleteComplaint(id: string): Promise<boolean> {
+    return await ComplaintRepository.delete(id);
   }
 
-  static async addReply(id: string, reply: string, replied_by?: string): Promise<Suggestion | null> {
-    return await SuggestionRepository.addReply(id, reply, replied_by);
+  static async addReply(id: string, reply: string, replied_by?: string): Promise<Complaint | null> {
+    return await ComplaintRepository.addReply(id, reply, replied_by);
   }
 }
 

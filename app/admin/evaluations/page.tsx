@@ -37,7 +37,7 @@ interface Teacher {
 
 const RATING_LABELS: Record<number, string> = {
   1: 'ضعيف',
-  2: 'مقبول',
+  2: 'وسط',
   3: 'جيد',
   4: 'جيد جداً',
   5: 'ممتاز',

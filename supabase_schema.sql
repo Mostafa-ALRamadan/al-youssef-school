@@ -47,12 +47,14 @@ CREATE TABLE IF NOT EXISTS parents (
     name TEXT NOT NULL,
     phone TEXT,
     address TEXT,
+    auth_email TEXT UNIQUE, -- Internal hidden email for Supabase Auth
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
     CONSTRAINT unique_parent_phone UNIQUE (phone)
 );
 
 COMMENT ON TABLE parents IS 'Parent information linked to user accounts';
+COMMENT ON COLUMN parents.auth_email IS 'Internal hidden email for Supabase Auth (e.g., parent_123@alyoussef.local)';
 
 -- ============================================================================
 -- 4. CLASSES TABLE / جدول الصفوف الدراسية
@@ -74,6 +76,7 @@ COMMENT ON TABLE classes IS 'School classes and grade levels';
 CREATE TABLE IF NOT EXISTS students (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
+    login_name TEXT UNIQUE, -- Unique triple name for parent login (e.g., عمر علي عبده)
     class_id UUID REFERENCES classes(id) ON DELETE SET NULL,
     parent_id UUID REFERENCES parents(id) ON DELETE SET NULL,
     date_of_birth DATE,
@@ -83,6 +86,7 @@ CREATE TABLE IF NOT EXISTS students (
 );
 
 COMMENT ON TABLE students IS 'Student information linked to parents and classes';
+COMMENT ON COLUMN students.login_name IS 'Unique triple name for parent login (e.g., عمر علي عبده)';
 
 -- ============================================================================
 -- 6. TEACHERS TABLE / جدول المعلمين
@@ -93,11 +97,12 @@ CREATE TABLE IF NOT EXISTS teachers (
     user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     phone TEXT,
+    subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
-COMMENT ON TABLE teachers IS 'Teacher information linked to user accounts';
+COMMENT ON TABLE teachers IS 'Teacher information with primary subject';
 
 -- ============================================================================
 -- 7. SUBJECTS TABLE / جدول المواد الدراسية
@@ -113,19 +118,21 @@ CREATE TABLE IF NOT EXISTS subjects (
 COMMENT ON TABLE subjects IS 'School subjects and courses';
 
 -- ============================================================================
--- 8. CLASS_SUBJECTS TABLE / جدول المواد لكل صف
+-- 8. TEACHER ASSIGNMENTS TABLE / جدول تعيين المعلمين
 -- ============================================================================
+-- Note: This replaces the old class_subjects table for better flexibility
+-- A teacher can teach the same subject to multiple classes
 
-CREATE TABLE IF NOT EXISTS class_subjects (
+CREATE TABLE IF NOT EXISTS teacher_assignments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    teacher_id UUID NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
     subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-    teacher_id UUID REFERENCES teachers(id) ON DELETE CASCADE,
-    UNIQUE(class_id, subject_id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+    CONSTRAINT unique_teacher_assignment UNIQUE (teacher_id, subject_id, class_id)
 );
 
-COMMENT ON TABLE class_subjects IS 'Subjects assigned to each class with teachers';
+COMMENT ON TABLE teacher_assignments IS 'Teacher assignments to classes and subjects - allows one teacher to teach same subject to multiple classes';
 
 -- ============================================================================
 -- 8.5. ACADEMIC YEARS TABLE / جدول السنوات الدراسية
@@ -224,21 +231,6 @@ CREATE INDEX idx_grades_exam_id ON grades(exam_id);
 CREATE INDEX idx_grades_student_id ON grades(student_id);
 
 -- ============================================================================
--- 11. TEACHER ASSIGNMENTS TABLE / جدول تعيين المعلمين
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS teacher_assignments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    teacher_id UUID NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
-    subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
-    CONSTRAINT unique_teacher_assignment UNIQUE (teacher_id, subject_id, class_id)
-);
-
-COMMENT ON TABLE teacher_assignments IS 'Teacher assignments to classes and subjects';
-
--- ============================================================================
 -- 13. PAYMENTS TABLE / جدول المدفوعات والأقساط
 -- ============================================================================
 
@@ -280,13 +272,13 @@ CREATE TABLE IF NOT EXISTS schedule (
 COMMENT ON TABLE schedule IS 'Weekly class schedule for all classes';
 
 -- ============================================================================
--- 15. SUGGESTIONS TABLE / جدول الاقتراحات
+-- 15. COMPLAINTS TABLE / جدول الشكاوي
 -- ============================================================================
 
 -- Drop existing table to recreate properly
-DROP TABLE IF EXISTS suggestions CASCADE;
+DROP TABLE IF EXISTS complaints CASCADE;
 
-CREATE TABLE suggestions (
+CREATE TABLE complaints (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
@@ -299,10 +291,10 @@ CREATE TABLE suggestions (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_suggestions_user_id ON suggestions(user_id);
-CREATE INDEX idx_suggestions_created_at ON suggestions(created_at);
+CREATE INDEX idx_complaints_user_id ON complaints(user_id);
+CREATE INDEX idx_complaints_created_at ON complaints(created_at);
 
-COMMENT ON TABLE suggestions IS 'Suggestions and feedback from parents/teachers';
+COMMENT ON TABLE complaints IS 'Complaints and feedback from parents/teachers';
 
 -- ============================================================================
 -- 16. SUBJECT_CONTENT TABLE / جدول محتوى المواد
@@ -331,28 +323,33 @@ COMMENT ON TABLE subject_content IS 'Educational content uploaded by teachers';
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
+CREATE INDEX IF NOT EXISTS idx_users_login_name ON users(login_name);
+CREATE INDEX IF NOT EXISTS idx_users_auth_email ON users(auth_email);
 
 -- Parents indexes
 CREATE INDEX IF NOT EXISTS idx_parents_user_id ON parents(user_id);
 CREATE INDEX IF NOT EXISTS idx_parents_phone ON parents(phone);
+CREATE INDEX IF NOT EXISTS idx_parents_auth_email ON parents(auth_email);
 
 -- Students indexes
 CREATE INDEX IF NOT EXISTS idx_students_class_id ON students(class_id);
 CREATE INDEX IF NOT EXISTS idx_students_parent_id ON students(parent_id);
+CREATE INDEX IF NOT EXISTS idx_students_login_name ON students(login_name);
 
 -- Classes indexes
 -- CREATE INDEX IF NOT EXISTS idx_classes_academic_year ON classes(academic_year);
 
 -- Teachers indexes
 CREATE INDEX IF NOT EXISTS idx_teachers_user_id ON teachers(user_id);
+CREATE INDEX IF NOT EXISTS idx_teachers_subject_id ON teachers(subject_id);
 
 -- Subjects indexes
 -- (no additional indexes needed for simplified schema)
 
--- Class subjects indexes
-CREATE INDEX IF NOT EXISTS idx_class_subjects_class_id ON class_subjects(class_id);
-CREATE INDEX IF NOT EXISTS idx_class_subjects_subject_id ON class_subjects(subject_id);
-CREATE INDEX IF NOT EXISTS idx_class_subjects_teacher_id ON class_subjects(teacher_id);
+-- Teacher assignments indexes
+CREATE INDEX IF NOT EXISTS idx_teacher_assignments_teacher_id ON teacher_assignments(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_assignments_subject_id ON teacher_assignments(subject_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_assignments_class_id ON teacher_assignments(class_id);
 
 -- Announcements indexes
 CREATE INDEX IF NOT EXISTS idx_announcements_pinned ON announcements(is_pinned);
@@ -380,9 +377,9 @@ CREATE INDEX IF NOT EXISTS idx_schedule_teacher_id ON schedule(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_schedule_day ON schedule(day);
 CREATE INDEX IF NOT EXISTS idx_schedule_class_day ON schedule(class_id, day);
 
--- Suggestions indexes
-CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
-CREATE INDEX IF NOT EXISTS idx_suggestions_created_at ON suggestions(created_at DESC);
+-- Complaints indexes
+CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
+CREATE INDEX IF NOT EXISTS idx_complaints_created_at ON complaints(created_at DESC);
 
 -- Academic years and semesters indexes
 CREATE INDEX IF NOT EXISTS idx_academic_years_active ON academic_years(is_active);
@@ -405,7 +402,7 @@ ALTER TABLE students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teachers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subjects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE class_subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE teacher_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE grades ENABLE ROW LEVEL SECURITY;
@@ -413,7 +410,7 @@ ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schedule ENABLE ROW LEVEL SECURITY;
 ALTER TABLE academic_years ENABLE ROW LEVEL SECURITY;
 ALTER TABLE semesters ENABLE ROW LEVEL SECURITY;
-ALTER TABLE suggestions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE complaints ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subject_content ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================================
@@ -474,9 +471,9 @@ ON subjects FOR SELECT
 TO authenticated
 USING (true);
 
--- CLASS_SUBJECTS: Public read
-CREATE POLICY "Class subjects are viewable by authenticated users"
-ON class_subjects FOR SELECT
+-- TEACHER_ASSIGNMENTS: Public read
+CREATE POLICY "Teacher assignments are viewable by authenticated users"
+ON teacher_assignments FOR SELECT
 TO authenticated
 USING (true);
 
@@ -555,17 +552,17 @@ TO authenticated
 USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'))
 WITH CHECK (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
 
--- SUGGESTIONS: Anyone can create, admins can view/manage
-CREATE POLICY "Suggestions are viewable by admins"
-ON suggestions FOR SELECT
+-- COMPLAINTS: Anyone can create, admins can view/manage
+CREATE POLICY "Complaints are viewable by admins"
+ON complaints FOR SELECT
 TO authenticated
 USING (
     EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin') OR
     (is_anonymous = false AND sender_email = (SELECT email FROM users WHERE id = auth.uid()))
 );
 
-CREATE POLICY "Anyone can create suggestions"
-ON suggestions FOR INSERT
+CREATE POLICY "Anyone can create complaints"
+ON complaints FOR INSERT
 TO authenticated
 WITH CHECK (true);
 
@@ -666,7 +663,7 @@ UNIQUE (teacher_id, day_of_week, start_time);
 CREATE TRIGGER update_schedule_updated_at BEFORE UPDATE ON schedule
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_suggestions_updated_at BEFORE UPDATE ON suggestions
+CREATE TRIGGER update_complaints_updated_at BEFORE UPDATE ON complaints
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_subject_content_updated_at BEFORE UPDATE ON subject_content

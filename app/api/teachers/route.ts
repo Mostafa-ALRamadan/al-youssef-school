@@ -10,10 +10,10 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServerSupabaseClient();
     
-    // Fetch teachers
+    // Fetch teachers with their primary subject
     const { data: teachers, error: teachersError } = await supabase
       .from('teachers')
-      .select('*')
+      .select('*, subjects!left(name)')
       .order('created_at', { ascending: false });
     
     if (teachersError) {
@@ -28,25 +28,26 @@ export async function GET(request: NextRequest) {
     const { data: users } = await supabase.from('users').select('id, email');
     const userMap = new Map(users?.map(u => [u.id, u.email]) || []);
 
-    // Fetch class_subjects with subject and class names
-    const { data: classSubjects } = await supabase
-      .from('class_subjects')
+    // Fetch teacher_assignments with subject and class names
+    const { data: assignments } = await supabase
+      .from('teacher_assignments')
       .select('teacher_id, class_id, subject_id, subjects(name), classes(name)');
     
-    const csMap = new Map(
-      (classSubjects as any[])?.map(cs => [cs.teacher_id, cs]) || []
+    const assignmentMap = new Map(
+      (assignments as any[])?.map(a => [a.teacher_id, a]) || []
     );
 
     const transformedTeachers = teachers.map((teacher: any) => {
-      const cs = csMap.get(teacher.id);
-      const subjectData = cs?.subjects as { name?: string } | undefined;
-      const classData = cs?.classes as { name?: string } | undefined;
+      const assignment = assignmentMap.get(teacher.id);
+      const teacherSubjectData = teacher.subjects as { name?: string } | undefined;
+      const assignmentSubjectData = assignment?.subjects as { name?: string } | undefined;
+      const classData = assignment?.classes as { name?: string } | undefined;
       return {
         ...teacher,
         email: userMap.get(teacher.user_id) || '',
-        subject_id: cs?.subject_id || '',
-        subject_name: subjectData?.name || '',
-        class_id: cs?.class_id || '',
+        subject_id: teacher.subject_id || assignment?.subject_id || '',
+        subject_name: teacherSubjectData?.name || assignmentSubjectData?.name || '',
+        class_id: assignment?.class_id || '',
         class_name: classData?.name || '',
       };
     });
@@ -113,6 +114,7 @@ export async function POST(request: NextRequest) {
         user_id: userId,
         name,
         phone,
+        subject_id: subject_id || null,
       })
       .select()
       .single();
@@ -128,16 +130,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (subject_id && class_id) {
-      const { error: csError } = await supabase
-        .from('class_subjects')
+      const { error: taError } = await supabase
+        .from('teacher_assignments')
         .insert({
           class_id,
           subject_id,
           teacher_id: teacher.id,
         });
 
-      if (csError) {
-        console.error('Failed to create class_subjects:', csError);
+      if (taError) {
+        console.error('Failed to create teacher_assignment:', taError);
       }
     }
 
@@ -171,9 +173,10 @@ export async function PUT(request: NextRequest) {
 
     const supabase = createServerSupabaseClient();
 
-    const updates: { name?: string; phone?: string } = {};
+    const updates: { name?: string; phone?: string; subject_id?: string } = {};
     if (name !== undefined) updates.name = name;
     if (phone !== undefined) updates.phone = phone;
+    if (subject_id !== undefined) updates.subject_id = subject_id;
 
     const { data: teacher, error } = await supabase
       .from('teachers')
@@ -189,21 +192,22 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    if (subject_id && class_id) {
+    // Update teacher_assignments if class_id is provided (optional)
+    if (class_id) {
       const { data: existing } = await supabase
-        .from('class_subjects')
-        .select('id')
+        .from('teacher_assignments')
+        .select('id, subject_id')
         .eq('teacher_id', id)
         .maybeSingle();
 
       if (existing) {
         await supabase
-          .from('class_subjects')
-          .update({ class_id, subject_id })
+          .from('teacher_assignments')
+          .update({ class_id, subject_id: subject_id || existing.subject_id })
           .eq('id', existing.id);
-      } else {
+      } else if (subject_id) {
         await supabase
-          .from('class_subjects')
+          .from('teacher_assignments')
           .insert({ class_id, subject_id, teacher_id: id });
       }
     }
@@ -240,6 +244,13 @@ export async function DELETE(request: NextRequest) {
       .select('user_id')
       .eq('id', id)
       .single();
+
+    // Delete all related records first
+    await supabase.from('weekly_schedule').delete().eq('teacher_id', id);
+    await supabase.from('teacher_assignments').delete().eq('teacher_id', id);
+    await supabase.from('subject_content').delete().eq('teacher_id', id);
+    await supabase.from('exams').delete().eq('teacher_id', id);
+    await supabase.from('student_evaluations').delete().eq('teacher_id', id);
 
     const { error } = await supabase
       .from('teachers')

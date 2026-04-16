@@ -1,0 +1,112 @@
+{
+  "info": {
+    "_postman_id": "al-youssef-school-api",
+    "name": "Al-Youssef School API",
+    "description": "API Collection for Al-Youssef School Management System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "description": "Login endpoints for different user types",
+      "item": [
+        {
+          "name": "Admin/Teacher Login (Email)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"your_password\"\n}"
+            },
+            "description": "Login for admins and teachers using email/password"
+          },
+          "response": []
+        },
+        {
+          "name": "Parent Login (Student Name + Password) ⭐",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/parent-login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "parent-login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"student_login_name\": \"عمر علي عبده\",\n  \"password\": \"parent_password\"\n}"
+            },
+            "description": "⭐ NEW: Parent login using student's triple name + parent password.\n\nThe student_login_name is the unique triple name generated when creating a student (e.g., 'عمر علي عبده').\n\nResponse includes:\n- user: Parent user info\n- session: Supabase session with access_token and refresh_token"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Students",
+      "description": "Student management endpoints",
+      "item": [
+        {
+          "name": "Get All Students",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "students"]
+            },
+            "description": "Returns all students with their login_name (for parent login)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Student (Generates Login Name)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "students"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"عمر\",\n  \"class_id\": \"class-uuid-here\",\n  \"parent_name\": \"علي عبده\",\n  \"parent_password\": \"parent_password_123\",\n  \"parent_phone\": \"0912345678\",\n  \"parent_address\": \"دمشق\",\n  \"date_of_birth\": \"2010-05-15\",\n  \"gender\": \"male\"\n}"
+            },
+            "description": "Creates a new student with auto-generated:\n- login_name: Triple name for parent login (e.g., 'عمر علي عبده')\n- auth_email: Hidden email for Supabase Auth (parent_xxx@alyoussef.local)\n\nNote: No email required for parents anymore!"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ]
+}

@@ -17,6 +17,23 @@ import { formatNumber, formatDecimal, formatPercentage, formatFraction, toArabic
 import { Award, FileText, Trash2, Users, Eye, Search } from 'lucide-react';
 import type { Exam, Class, Subject } from '@/types';
 
+// Grade categories based on percentage
+const getGradeCategory = (score: number, maxScore: number): { label: string; color: string } => {
+  const percentage = (score / maxScore) * 100;
+
+  if (percentage >= 90) {
+    return { label: 'ممتاز', color: 'bg-green-100 text-green-800' };
+  } else if (percentage >= 75) {
+    return { label: 'جيد جداً', color: 'bg-blue-100 text-blue-800' };
+  } else if (percentage >= 60) {
+    return { label: 'جيد', color: 'bg-yellow-100 text-yellow-800' };
+  } else if (percentage >= 40) {
+    return { label: 'وسط', color: 'bg-orange-100 text-orange-800' };
+  } else {
+    return { label: 'ضعيف', color: 'bg-red-100 text-red-800' };
+  }
+};
+
 export default function AdminGradesPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -163,15 +180,22 @@ export default function AdminGradesPage() {
     const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
     const highestScore = Math.max(...scores);
     const lowestScore = Math.min(...scores);
-    const passCount = scores.filter(s => (s / maxScore) * 100 >= 60).length;
+
+    // Calculate category distribution
+    const categories = {
+      excellent: scores.filter(s => getGradeCategory(s, maxScore).label === 'ممتاز').length,
+      veryGood: scores.filter(s => getGradeCategory(s, maxScore).label === 'جيد جداً').length,
+      good: scores.filter(s => getGradeCategory(s, maxScore).label === 'جيد').length,
+      average: scores.filter(s => getGradeCategory(s, maxScore).label === 'وسط').length,
+      weak: scores.filter(s => getGradeCategory(s, maxScore).label === 'ضعيف').length,
+    };
 
     return {
       avgScore,
       highestScore,
       lowestScore,
-      passCount,
       totalCount: scores.length,
-      passRate: Math.round((passCount / scores.length) * 100),
+      categories,
     };
   };
 
@@ -384,45 +408,63 @@ export default function AdminGradesPage() {
 
                 {/* Statistics */}
                 {stats && (
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="space-y-4">
+                    {/* Basic Stats */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <Card>
+                        <CardContent className="py-4 text-center">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {formatDecimal(stats.avgScore, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                          </div>
+                          <div className="text-sm text-gray-500">المتوسط</div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="py-4 text-center">
+                          <div className="text-2xl font-bold text-green-600">
+                            {formatNumber(stats.highestScore)}
+                          </div>
+                          <div className="text-sm text-gray-500">الأعلى</div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="py-4 text-center">
+                          <div className="text-2xl font-bold text-red-600">
+                            {formatNumber(stats.lowestScore)}
+                          </div>
+                          <div className="text-sm text-gray-500">الأدنى</div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Category Distribution */}
                     <Card>
-                      <CardContent className="py-4 text-center flex flex-col items-center justify-center">
-                        <div className="text-2xl font-bold text-blue-600 text-center">
-                          {formatDecimal(stats.avgScore, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                      <CardHeader>
+                        <CardTitle className="text-sm">توزيع التقديرات</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-5 gap-2 text-center">
+                          <div className="bg-green-50 p-2 rounded">
+                            <div className="text-xl font-bold text-green-700">{stats.categories.excellent}</div>
+                            <div className="text-xs text-green-600">ممتاز</div>
+                          </div>
+                          <div className="bg-blue-50 p-2 rounded">
+                            <div className="text-xl font-bold text-blue-700">{stats.categories.veryGood}</div>
+                            <div className="text-xs text-blue-600">جيد جداً</div>
+                          </div>
+                          <div className="bg-yellow-50 p-2 rounded">
+                            <div className="text-xl font-bold text-yellow-700">{stats.categories.good}</div>
+                            <div className="text-xs text-yellow-600">جيد</div>
+                          </div>
+                          <div className="bg-orange-50 p-2 rounded">
+                            <div className="text-xl font-bold text-orange-700">{stats.categories.average}</div>
+                            <div className="text-xs text-orange-600">وسط</div>
+                          </div>
+                          <div className="bg-red-50 p-2 rounded">
+                            <div className="text-xl font-bold text-red-700">{stats.categories.weak}</div>
+                            <div className="text-xs text-red-600">ضعيف</div>
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-500 text-center">المتوسط</div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="py-4 text-center flex flex-col items-center justify-center">
-                        <div className="text-2xl font-bold text-green-600 text-center">
-                          {formatNumber(stats.highestScore)}
-                        </div>
-                        <div className="text-sm text-gray-500 text-center">الأعلى</div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="py-4 text-center flex flex-col items-center justify-center">
-                        <div className="text-2xl font-bold text-red-600 text-center">
-                          {formatNumber(stats.lowestScore)}
-                        </div>
-                        <div className="text-sm text-gray-500 text-center">الأدنى</div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="py-4 text-center flex flex-col items-center justify-center">
-                        <div className="text-2xl font-bold text-purple-600 text-center">
-                          {formatFraction(stats.passCount, stats.totalCount)}
-                        </div>
-                        <div className="text-sm text-gray-500 text-center">النجاح</div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="py-4 text-center flex flex-col items-center justify-center">
-                        <div className="text-2xl font-bold text-orange-600 text-center">
-                          {formatPercentage(stats.passRate)}
-                        </div>
-                        <div className="text-sm text-gray-500 text-center">نسبة النجاح</div>
                       </CardContent>
                     </Card>
                   </div>
@@ -446,15 +488,15 @@ export default function AdminGradesPage() {
                         <TableHeader>
                           <TableRow className="bg-gray-50">
                             <TableHead className="text-center w-[30%]">اسم الطالب</TableHead>
-                            <TableHead className="text-center w-[20%]">الدرجة</TableHead>
+                            <TableHead className="text-center w-[25%]">الدرجة</TableHead>
+                            <TableHead className="text-center w-[25%]">التقدير</TableHead>
                             <TableHead className="text-center w-[20%]">النسبة</TableHead>
-                            <TableHead className="text-center w-[30%]">الحالة</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {examGrades.map((grade) => {
                             const percentage = (grade.score / (selectedExam?.max_score || 1)) * 100;
-                            const isPass = percentage >= 60;
+                            const category = getGradeCategory(grade.score, selectedExam?.max_score || 1);
                             return (
                               <TableRow key={grade.id}>
                                 <TableCell className="text-center font-medium">
@@ -464,14 +506,12 @@ export default function AdminGradesPage() {
                                   {formatFraction(grade.score, selectedExam?.max_score || 0)}
                                 </TableCell>
                                 <TableCell className="text-center">
-                                  {formatPercentage(percentage)}
+                                  <span className={`px-2 py-1 rounded-full text-sm ${category.color}`}>
+                                    {category.label}
+                                  </span>
                                 </TableCell>
                                 <TableCell className="text-center">
-                                  <span className={`px-3 py-1 rounded-full text-sm ${
-                                    isPass ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                  }`}>
-                                    {isPass ? 'ناجح' : 'راسب'}
-                                  </span>
+                                  {formatPercentage(percentage)}
                                 </TableCell>
                               </TableRow>
                             );
