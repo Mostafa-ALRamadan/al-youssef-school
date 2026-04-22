@@ -67,25 +67,17 @@ export default function AcademicYearsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const supabase = (await import('@/lib/supabase')).createClient();
-      
-      // Load academic years
-      const { data: yearsData, error: yearsError } = await supabase
-        .from('academic_years')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Load academic years from API
+      const yearsResponse = await fetch('/api/academic-years');
+      if (!yearsResponse.ok) throw new Error('Failed to load academic years');
+      const yearsData = await yearsResponse.json();
+      setYears(yearsData.academicYears || []);
 
-      if (yearsError) throw yearsError;
-      setYears(yearsData || []);
-
-      // Load semesters
-      const { data: semestersData, error: semestersError } = await supabase
-        .from('semesters')
-        .select('*')
-        .order('start_date', { ascending: true });
-
-      if (semestersError) throw semestersError;
-      setSemesters(semestersData || []);
+      // Load semesters from API
+      const semestersResponse = await fetch('/api/semesters');
+      if (!semestersResponse.ok) throw new Error('Failed to load semesters');
+      const semestersData = await semestersResponse.json();
+      setSemesters(semestersData.semesters || []);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -109,16 +101,20 @@ export default function AcademicYearsPage() {
     }
 
     try {
-      const supabase = (await import('@/lib/supabase')).createClient();
-      const { error } = await supabase
-        .from('academic_years')
-        .insert({
+      const response = await fetch('/api/academic-years', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: yearForm.name,
           start_date: yearForm.start_date,
           end_date: yearForm.end_date,
-        });
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create academic year');
+      }
 
       toast({
         title: 'تم بنجاح',
@@ -148,17 +144,21 @@ export default function AcademicYearsPage() {
     }
 
     try {
-      const supabase = (await import('@/lib/supabase')).createClient();
-      const { error } = await supabase
-        .from('semesters')
-        .insert({
+      const response = await fetch('/api/semesters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           academic_year_id: selectedYear.id,
           name: semesterForm.name,
           start_date: semesterForm.start_date,
           end_date: semesterForm.end_date,
-        });
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create semester');
+      }
 
       toast({
         title: 'تم بنجاح',
@@ -179,47 +179,20 @@ export default function AcademicYearsPage() {
 
   const setActiveYear = async (yearId: string) => {
     try {
-      const supabase = (await import('@/lib/supabase')).createClient();
+      const response = await fetch('/api/academic-years/set-active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ yearId }),
+      });
 
-      // Get the first semester of the new year (if any)
-      const yearSemesters = getSemestersForYear(yearId);
-      const firstSemester = yearSemesters[0];
-
-      // First, deactivate all years
-      await supabase
-        .from('academic_years')
-        .update({ is_active: false })
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      // Deactivate all semesters (from old year)
-      await supabase
-        .from('semesters')
-        .update({ is_active: false })
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      // Activate the selected year
-      const { error: yearError } = await supabase
-        .from('academic_years')
-        .update({ is_active: true })
-        .eq('id', yearId);
-
-      if (yearError) throw yearError;
-
-      // Activate the first semester of this year (if exists)
-      if (firstSemester) {
-        const { error: semesterError } = await supabase
-          .from('semesters')
-          .update({ is_active: true })
-          .eq('id', firstSemester.id);
-
-        if (semesterError) throw semesterError;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to set active year');
       }
 
       toast({
         title: 'تم بنجاح',
-        description: firstSemester
-          ? 'تم تفعيل السنة الدراسية والفصل الدراسي الأول'
-          : 'تم تفعيل السنة الدراسية',
+        description: 'تم تفعيل السنة الدراسية',
       });
       loadData();
     } catch (error) {
@@ -234,37 +207,16 @@ export default function AcademicYearsPage() {
 
   const setActiveSemester = async (semesterId: string) => {
     try {
-      const supabase = (await import('@/lib/supabase')).createClient();
-      
-      // Get the semester's year ID
-      const semester = semesters.find(s => s.id === semesterId);
-      if (!semester) throw new Error('Semester not found');
+      const response = await fetch('/api/semesters/set-active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ semesterId }),
+      });
 
-      // First, deactivate all years
-      await supabase
-        .from('academic_years')
-        .update({ is_active: false })
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      // Activate the semester's year
-      await supabase
-        .from('academic_years')
-        .update({ is_active: true })
-        .eq('id', semester.academic_year_id);
-
-      // Then, deactivate all semesters
-      await supabase
-        .from('semesters')
-        .update({ is_active: false })
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      // Activate the selected semester
-      const { error } = await supabase
-        .from('semesters')
-        .update({ is_active: true })
-        .eq('id', semesterId);
-
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to set active semester');
+      }
 
       toast({
         title: 'تم بنجاح',
@@ -287,13 +239,14 @@ export default function AcademicYearsPage() {
     }
 
     try {
-      const supabase = (await import('@/lib/supabase')).createClient();
-      const { error } = await supabase
-        .from('academic_years')
-        .delete()
-        .eq('id', yearId);
+      const response = await fetch(`/api/academic-years/${yearId}`, {
+        method: 'DELETE',
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete year');
+      }
 
       toast({
         title: 'تم بنجاح',
@@ -316,13 +269,14 @@ export default function AcademicYearsPage() {
     }
 
     try {
-      const supabase = (await import('@/lib/supabase')).createClient();
-      const { error } = await supabase
-        .from('semesters')
-        .delete()
-        .eq('id', semesterId);
+      const response = await fetch(`/api/semesters/${semesterId}`, {
+        method: 'DELETE',
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete semester');
+      }
 
       toast({
         title: 'تم بنجاح',
@@ -341,20 +295,22 @@ export default function AcademicYearsPage() {
 
   const openEditYear = (year: AcademicYear) => {
     setEditingYear(year);
+    
     setYearForm({
       name: year.name,
-      start_date: year.start_date,
-      end_date: year.end_date,
+      start_date: year.start_date || '',
+      end_date: year.end_date || '',
     });
     setEditYearDialogOpen(true);
   };
 
   const openEditSemester = (semester: Semester) => {
     setEditingSemester(semester);
+    
     setSemesterForm({
       name: semester.name,
-      start_date: semester.start_date,
-      end_date: semester.end_date,
+      start_date: semester.start_date || '',
+      end_date: semester.end_date || '',
     });
     setEditSemesterDialogOpen(true);
   };
@@ -370,17 +326,20 @@ export default function AcademicYearsPage() {
     }
 
     try {
-      const supabase = (await import('@/lib/supabase')).createClient();
-      const { error } = await supabase
-        .from('academic_years')
-        .update({
+      const response = await fetch(`/api/academic-years/${editingYear.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: yearForm.name,
           start_date: yearForm.start_date,
           end_date: yearForm.end_date,
-        })
-        .eq('id', editingYear.id);
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update year');
+      }
 
       toast({
         title: 'تم بنجاح',
@@ -411,17 +370,20 @@ export default function AcademicYearsPage() {
     }
 
     try {
-      const supabase = (await import('@/lib/supabase')).createClient();
-      const { error } = await supabase
-        .from('semesters')
-        .update({
+      const response = await fetch(`/api/semesters/${editingSemester.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: semesterForm.name,
           start_date: semesterForm.start_date,
           end_date: semesterForm.end_date,
-        })
-        .eq('id', editingSemester.id);
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update semester');
+      }
 
       toast({
         title: 'تم بنجاح',

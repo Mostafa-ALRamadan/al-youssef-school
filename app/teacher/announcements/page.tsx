@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Megaphone, Users, GraduationCap, User } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TEACHER_SIDEBAR_ITEMS, USER_ROLES } from '@/constants';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 import type { Announcement } from '@/types';
 import { formatDate } from '@/utils/date';
 
@@ -19,12 +19,10 @@ export default function TeacherAnnouncementsPage() {
 
   const loadAnnouncements = async () => {
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
 
       const response = await fetch('/api/announcements/teacher', {
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
+          ...getAuthHeaders(),
         },
       });
 

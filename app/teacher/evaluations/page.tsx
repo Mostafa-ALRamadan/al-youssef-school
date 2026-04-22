@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { Star, Users, Plus, Pencil, Trash2 } from 'lucide-react';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 import type { StudentEvaluation } from '@/types';
 import { formatDate } from '@/utils/date';
 import { formatNumber } from '@/utils/number';
@@ -88,27 +88,14 @@ export default function TeacherEvaluationsPage() {
 
   const loadClasses = async () => {
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) return;
+      const response = await fetch('/api/teacher/classes', {
+        headers: getAuthHeaders(),
+      });
 
-      // Get teacher's assigned classes
-      const { data: teacherData } = await supabase
-        .from('teachers')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!teacherData) return;
-
-      const { data: assignments } = await supabase
-        .from('teacher_assignments')
-        .select('class_id, classes(id, name)')
-        .eq('teacher_id', teacherData.id);
-
-      const uniqueClasses = assignments?.map((a: any) => a.classes) || [];
-      setClasses(uniqueClasses);
+      if (response.ok) {
+        const data = await response.json();
+        setClasses(data.classes || []);
+      }
     } catch (error) {
       console.error('Error loading classes:', error);
     }
@@ -132,22 +119,14 @@ export default function TeacherEvaluationsPage() {
 
   const loadStudents = async () => {
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('students')
-        .select('id, name, classes(name)')
-        .eq('class_id', selectedClass)
-        .order('name');
+      const response = await fetch(`/api/teacher/students?class_id=${selectedClass}`, {
+        headers: getAuthHeaders(),
+      });
 
-      if (error) throw error;
-
-      const studentsData = data?.map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        class_name: s.classes?.name,
-      })) || [];
-
-      setStudents(studentsData);
+      if (response.ok) {
+        const data = await response.json();
+        setStudents(data.students || []);
+      }
     } catch (error) {
       console.error('Error loading students:', error);
     }
@@ -156,23 +135,14 @@ export default function TeacherEvaluationsPage() {
   const loadEvaluations = async () => {
     try {
       setLoading(true);
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) return;
+      const response = await fetch(`/api/student-evaluations?class_id=${selectedClass}`, {
+        headers: getAuthHeaders(),
+      });
 
-      const { data: teacherData } = await supabase
-        .from('teachers')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!teacherData) return;
-
-      const response = await fetch(`/api/student-evaluations?class_id=${selectedClass}&teacher_id=${teacherData.id}`);
-      const data = await response.json();
-
-      setEvaluations(data.evaluations || []);
+      if (response.ok) {
+        const data = await response.json();
+        setEvaluations(data.evaluations || []);
+      }
     } catch (error) {
       console.error('Error loading evaluations:', error);
     } finally {
@@ -182,28 +152,18 @@ export default function TeacherEvaluationsPage() {
 
   const handleSubmit = async () => {
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) return;
-
-      const { data: teacherData } = await supabase
-        .from('teachers')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!teacherData) return;
-
       const url = '/api/student-evaluations';
       const method = isEditMode ? 'PUT' : 'POST';
       const body = isEditMode
         ? { id: selectedEvaluation?.id, ...formData }
-        : { student_id: selectedStudent, teacher_id: teacherData.id, semester_id: activeSemesterId, ...formData };
+        : { student_id: selectedStudent, semester_id: activeSemesterId, ...formData };
 
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify(body),
       });
 

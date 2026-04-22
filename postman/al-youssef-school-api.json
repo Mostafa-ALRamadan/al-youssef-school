@@ -50,9 +50,9 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"student_login_name\": \"عمر علي عبده\",\n  \"password\": \"parent_password\"\n}"
+              "raw": "{\n  \"login_name\": \"عمر علي عبده\",\n  \"password\": \"parent_password\"\n}"
             },
-            "description": "⭐ NEW: Parent login using student's triple name + parent password.\n\nThe student_login_name is the unique triple name generated when creating a student (e.g., 'عمر علي عبده').\n\nResponse includes:\n- user: Parent user info\n- session: Supabase session with access_token and refresh_token"
+            "description": "⭐ NEW: Parent login using student's triple name + parent password.\n\nThe login_name is the unique triple name generated when creating a student (e.g., 'عمر علي عبده').\n\nRequired fields:\n- login_name: Student's triple name\n- password: Parent password\n\nResponse includes:\n- parent: Parent info\n- children: List of parent's students\n- token: JWT token for authentication"
           },
           "response": []
         }
@@ -95,7 +95,59 @@
               "mode": "raw",
               "raw": "{\n  \"name\": \"عمر\",\n  \"class_id\": \"class-uuid-here\",\n  \"parent_name\": \"علي عبده\",\n  \"parent_password\": \"parent_password_123\",\n  \"parent_phone\": \"0912345678\",\n  \"parent_address\": \"دمشق\",\n  \"date_of_birth\": \"2010-05-15\",\n  \"gender\": \"male\"\n}"
             },
-            "description": "Creates a new student with auto-generated:\n- login_name: Triple name for parent login (e.g., 'عمر علي عبده')\n- auth_email: Hidden email for Supabase Auth (parent_xxx@alyoussef.local)\n\nNote: No email required for parents anymore!"
+            "description": "Creates a new student with auto-generated:\n- login_name: Triple name for parent login (e.g., 'عمر علي عبده')\n- parent password is hashed and stored for authentication\n\nNote: Parents log in with student triple name + parent password!"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Complaints",
+      "description": "Submit and view complaints (requires authentication)",
+      "item": [
+        {
+          "name": "Get All Complaints (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/complaints",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "complaints"]
+            },
+            "description": "Get all complaints (admin only). Requires Bearer token in Authorization header."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit New Complaint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/complaints",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "complaints"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"مشكلة في النظام\",\n  \"message\": \"وصف المشكلة ه\"\n}"
+            },
+            "description": "Submit a new complaint. Requires authentication.\n\nRate limit: 3 complaints per day per user.\n\nRequired fields:\n- title: Complaint title\n- message: Complaint content"
           },
           "response": []
         }

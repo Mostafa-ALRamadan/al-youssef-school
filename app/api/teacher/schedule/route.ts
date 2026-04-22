@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WeeklyScheduleService } from '@/services';
-import { supabase } from '@/lib/supabase-server';
+import { getCurrentUser } from '@/lib/auth';
+import { query } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,12 +14,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const token = authHeader.substring(7);
-
     // Verify token and get user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const user = getCurrentUser(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -26,13 +25,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Get teacher profile for current user
-    const { data: teacher, error: teacherError } = await supabase
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
+    const teacherResult = await query(
+      'SELECT id FROM teachers WHERE user_id = $1',
+      [user.userId]
+    );
+    const teacher = teacherResult.rows[0];
 
-    if (teacherError || !teacher) {
+    if (!teacher) {
       return NextResponse.json(
         { error: 'Teacher profile not found' },
         { status: 404 }

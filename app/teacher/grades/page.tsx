@@ -13,7 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { FileText, Save, BookOpen, GraduationCap, Award } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TEACHER_SIDEBAR_ITEMS, USER_ROLES } from '@/constants';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 import { formatDate } from '@/utils/date';
 import { formatNumber } from '@/utils/number';
 import type { Exam, Class, Subject, Student } from '@/types';
@@ -48,13 +48,8 @@ export default function TeacherGradesPage() {
   const loadExams = async () => {
     try {
       setLoading(true);
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch('/api/teacher/grades', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -70,42 +65,22 @@ export default function TeacherGradesPage() {
 
   const loadClassesAndSubjects = async () => {
     try {
-      const supabase = createClient();
+      // Load classes
+      const classesResponse = await fetch('/api/teacher/classes', {
+        headers: getAuthHeaders(),
+      });
+      if (classesResponse.ok) {
+        const classesData = await classesResponse.json();
+        setClasses(classesData.classes || []);
+      }
 
-      // Get current user's teacher ID
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: teacher } = await supabase
-        .from('teachers')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!teacher) return;
-
-      // Get teacher's assignments (class + subject combinations)
-      const { data: assignments } = await supabase
-        .from('teacher_assignments')
-        .select('class_id, subject_id, classes(id, name), subjects(id, name)')
-        .eq('teacher_id', teacher.id);
-
-      if (assignments) {
-        // Extract unique classes and subjects from assignments
-        const uniqueClasses = new Map();
-        const uniqueSubjects = new Map();
-
-        assignments.forEach((assignment: any) => {
-          if (assignment.classes) {
-            uniqueClasses.set(assignment.classes.id, assignment.classes);
-          }
-          if (assignment.subjects) {
-            uniqueSubjects.set(assignment.subjects.id, assignment.subjects);
-          }
-        });
-
-        setClasses(Array.from(uniqueClasses.values()));
-        setSubjects(Array.from(uniqueSubjects.values()));
+      // Load subjects
+      const subjectsResponse = await fetch('/api/teacher/subjects', {
+        headers: getAuthHeaders(),
+      });
+      if (subjectsResponse.ok) {
+        const subjectsData = await subjectsResponse.json();
+        setSubjects(subjectsData.subjects || []);
       }
     } catch (error) {
       console.error('Error loading classes and subjects:', error);
@@ -114,21 +89,13 @@ export default function TeacherGradesPage() {
 
   const loadStudents = async (classId: string) => {
     try {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('students')
-        .select('*')
-        .eq('class_id', classId)
-        .order('name');
+      const response = await fetch(`/api/teacher/students?class_id=${classId}`, {
+        headers: getAuthHeaders(),
+      });
 
-      if (data) {
-        setStudents(data);
-        // Initialize grades with 0
-        const initialGrades: Record<string, number> = {};
-        data.forEach((student: Student) => {
-          initialGrades[student.id] = 0;
-        });
-        setGrades(initialGrades);
+      if (response.ok) {
+        const data = await response.json();
+        setStudents(data.students || []);
       }
     } catch (error) {
       console.error('Error loading students:', error);
@@ -149,14 +116,11 @@ export default function TeacherGradesPage() {
 
     try {
       setSaving(true);
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch('/api/teacher/grades', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
           class_id: formData.class_id,
@@ -208,17 +172,13 @@ export default function TeacherGradesPage() {
 
   const handleExamSelect = async (exam: Exam) => {
     setSelectedExam(exam);
+    setGrades({}); // Reset grades when selecting new exam
     await loadStudents(exam.class_id);
 
     // Load existing grades for this exam
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch(`/api/teacher/grades/${exam.id}`, {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -227,7 +187,7 @@ export default function TeacherGradesPage() {
         data.exam?.grades?.forEach((grade: any) => {
           existingGrades[grade.student_id] = grade.score;
         });
-        setGrades(prev => ({ ...prev, ...existingGrades }));
+        setGrades(existingGrades); // Only set grades for this exam
       }
     } catch (error) {
       console.error('Error loading grades:', error);
@@ -255,9 +215,6 @@ export default function TeacherGradesPage() {
 
     try {
       setSaving(true);
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const gradesArray = Object.entries(grades).map(([student_id, score]) => ({
         student_id,
         score,
@@ -267,7 +224,7 @@ export default function TeacherGradesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({ grades: gradesArray }),
       });
@@ -277,6 +234,8 @@ export default function TeacherGradesPage() {
           title: 'تم بنجاح',
           description: 'تم حفظ الدرجات بنجاح',
         });
+        // Refresh exams to show "تم إدخال الدرجات" status
+        loadExams();
       } else {
         const error = await response.json();
         toast({
@@ -444,6 +403,11 @@ export default function TeacherGradesPage() {
                     <div className="text-sm mt-1 opacity-75">
                       التاريخ: {formatDate(exam.exam_date)}
                     </div>
+                    {(exam as any).has_grades && (
+                      <div className={`text-xs mt-2 ${selectedExam?.id === exam.id ? 'text-blue-200' : 'text-green-600'}`}>
+                        ✓ تم إدخال الدرجات
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TeacherStudentService } from '@/services';
-import { supabase } from '@/lib/supabase-server';
+import { getCurrentUser } from '@/lib/auth';
+import { query } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,9 +24,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify token and get user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const user = getCurrentUser(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Invalid token' },
         { status: 401 }
@@ -33,22 +34,47 @@ export async function GET(request: NextRequest) {
     }
 
     // Get teacher profile for current user
-    const { data: teacher, error: teacherError } = await supabase
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
+    const teacherResult = await query(
+      'SELECT id FROM teachers WHERE user_id = $1',
+      [user.userId]
+    );
+    const teacher = teacherResult.rows[0];
 
-    if (teacherError || !teacher) {
+    if (!teacher) {
       return NextResponse.json(
         { error: 'Teacher profile not found' },
         { status: 404 }
       );
     }
 
-    const result = await TeacherStudentService.getStudentsForTeacher(teacher.id);
+    // Get class_id from query params
+    const { searchParams } = new URL(request.url);
+    const classId = searchParams.get('class_id');
 
-    return NextResponse.json(result);
+    let students;
+    if (classId) {
+      // Get students for specific class
+      const studentsResult = await query(
+        'SELECT id, name, class_id FROM students WHERE class_id = $1 ORDER BY name',
+        [classId]
+      );
+      students = studentsResult.rows;
+    } else {
+      // Get all students for teacher
+      const result = await TeacherStudentService.getStudentsForTeacher(teacher.id);
+      students = result.students || [];
+    }
+
+    // Get teacher's classes for the dropdown
+    const classesResult = await query(`
+      SELECT DISTINCT c.id, c.name
+      FROM classes c
+      JOIN teacher_assignments ta ON c.id = ta.class_id
+      WHERE ta.teacher_id = $1
+      ORDER BY c.name
+    `, [teacher.id]);
+
+    return NextResponse.json({ students, classes: classesResult.rows });
   } catch (error: any) {
     console.error('Teacher students API error:', error);
     return NextResponse.json(

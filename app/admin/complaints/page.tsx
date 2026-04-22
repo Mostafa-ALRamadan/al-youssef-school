@@ -6,12 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Lightbulb, Trash2, MessageSquare, Reply, Eye } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Lightbulb, Trash2, MessageSquare, Reply } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MainAdminGuard } from '@/components/auth/MainAdminGuard';
 import { ADMIN_SIDEBAR_ITEMS, USER_ROLES } from '@/constants';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 import type { Complaint } from '@/types';
 import { formatDate } from '@/utils/date';
 
@@ -30,7 +30,9 @@ export default function AdminComplaintsPage() {
 
   const loadComplaints = async () => {
     try {
-      const response = await fetch('/api/complaints');
+      const response = await fetch('/api/complaints', {
+        headers: getAuthHeaders(),
+      });
       if (response.ok) {
         const data = await response.json();
         setComplaints(data.complaints || []);
@@ -46,7 +48,7 @@ export default function AdminComplaintsPage() {
     try {
       const response = await fetch(`/api/complaints/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
 
@@ -75,6 +77,7 @@ export default function AdminComplaintsPage() {
     try {
       const response = await fetch(`/api/complaints/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -97,23 +100,23 @@ export default function AdminComplaintsPage() {
   };
 
   const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending': return 'معلق';
-      case 'reviewed': return 'تم المراجعة';
-      case 'implemented': return 'تم التنفيذ';
-      case 'rejected': return 'مرفوض';
-      default: return status;
-    }
+    const labels: Record<string, string> = {
+      'pending': 'معلق',
+      'in_progress': 'تم المراجعة',
+      'resolved': 'تم التنفيذ',
+      'closed': 'مرفوض',
+    };
+    return labels[status] || status;
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'reviewed': return 'bg-blue-100 text-blue-800';
-      case 'implemented': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+    const colors: Record<string, string> = {
+      'pending': 'bg-yellow-100 text-yellow-800',
+      'in_progress': 'bg-blue-100 text-blue-800',
+      'resolved': 'bg-green-100 text-green-800',
+      'closed': 'bg-red-100 text-red-800',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
   const handleReply = async () => {
@@ -123,7 +126,7 @@ export default function AdminComplaintsPage() {
     try {
       const response = await fetch(`/api/complaints/${selectedComplaint.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ reply: replyText.trim() }),
       });
 
@@ -218,9 +221,9 @@ export default function AdminComplaintsPage() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="pending">معلق</SelectItem>
-                              <SelectItem value="reviewed">تم المراجعة</SelectItem>
-                              <SelectItem value="implemented">تم التنفيذ</SelectItem>
-                              <SelectItem value="rejected">مرفوض</SelectItem>
+                              <SelectItem value="in_progress">تم المراجعة</SelectItem>
+                              <SelectItem value="resolved">تم التنفيذ</SelectItem>
+                              <SelectItem value="closed">مرفوض</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableCell>

@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase-server';
+import { NextRequest, NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 
 // GET /api/student-evaluations - Get all evaluations or filter by student/class/teacher/semester
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const studentId = searchParams.get('student_id');
@@ -10,48 +10,42 @@ export async function GET(request: Request) {
     const teacherId = searchParams.get('teacher_id');
     const semesterId = searchParams.get('semester_id');
 
-    
-    let query = supabase
-      .from('student_evaluations')
-      .select(`
-        *,
-        students!inner(name, class_id, classes(name)),
-        teachers(name)
-      `);
+    // Build dynamic query with JOINs
+    let sql = `
+      SELECT se.*, s.name as student_name, s.class_id, c.name as class_name, t.name as teacher_name
+      FROM student_evaluations se
+      LEFT JOIN students s ON se.student_id = s.id
+      LEFT JOIN classes c ON s.class_id = c.id
+      LEFT JOIN teachers t ON se.teacher_id = t.id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
 
     if (studentId) {
-      query = query.eq('student_id', studentId);
+      params.push(studentId);
+      sql += ` AND se.student_id = $${params.length}`;
     }
 
     if (teacherId) {
-      query = query.eq('teacher_id', teacherId);
+      params.push(teacherId);
+      sql += ` AND se.teacher_id = $${params.length}`;
     }
 
     if (classId) {
-      query = query.eq('students.class_id', classId);
+      params.push(classId);
+      sql += ` AND s.class_id = $${params.length}`;
     }
 
     if (semesterId) {
-      query = query.eq('semester_id', semesterId);
+      params.push(semesterId);
+      sql += ` AND se.semester_id = $${params.length}`;
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    sql += ' ORDER BY se.created_at DESC';
 
-    if (error) {
-      console.error('Error fetching evaluations:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const result = await query(sql, params);
 
-    // Transform data to include student_name, class_name
-    const transformedData = data?.map((evaluation: any) => ({
-      ...evaluation,
-      student_name: evaluation.students?.name,
-      teacher_name: evaluation.teachers?.name,
-      class_id: evaluation.students?.class_id,
-      class_name: evaluation.students?.classes?.name,
-    })) || [];
-
-    return NextResponse.json({ evaluations: transformedData });
+    return NextResponse.json({ evaluations: result.rows });
   } catch (error: any) {
     console.error('GET evaluations error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -59,15 +53,30 @@ export async function GET(request: Request) {
 }
 
 // POST /api/student-evaluations - Create new evaluation
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const { getCurrentUser } = await import('@/lib/auth');
+    const user = getCurrentUser(request);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get teacher ID from user
+    const teacherResult = await query('SELECT id FROM teachers WHERE user_id = $1', [user.userId]);
+    const teacher = teacherResult.rows[0];
+
+    if (!teacher) {
+      return NextResponse.json({ error: 'Teacher not found' }, { status: 404 });
+    }
+
     const body = await request.json();
-    const { student_id, teacher_id, behavior_rating, participation_rating, homework_rating, notes } = body;
+    const { student_id, behavior_rating, participation_rating, homework_rating, notes } = body;
 
     // Validate required fields
-    if (!student_id || !teacher_id) {
+    if (!student_id) {
       return NextResponse.json(
-        { error: 'student_id and teacher_id are required' },
+        { error: 'student_id is required' },
         { status: 400 }
       );
     }
@@ -83,34 +92,20 @@ export async function POST(request: Request) {
       }
     }
 
-    
     // Get active semester
-    const { data: activeSemester } = await supabase
-      .from('semesters')
-      .select('id')
-      .eq('is_active', true)
-      .single();
+    const semesterResult = await query(
+      'SELECT id FROM semesters WHERE is_active = true LIMIT 1'
+    );
+    const activeSemester = semesterResult.rows[0];
 
-    const { data, error } = await supabase
-      .from('student_evaluations')
-      .insert({
-        student_id,
-        teacher_id,
-        behavior_rating,
-        participation_rating,
-        homework_rating,
-        notes,
-        semester_id: activeSemester?.id,
-      })
-      .select()
-      .single();
+    const result = await query(
+      `INSERT INTO student_evaluations (student_id, teacher_id, behavior_rating, participation_rating, homework_rating, notes, semester_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [student_id, teacher.id, behavior_rating, participation_rating, homework_rating, notes, activeSemester?.id]
+    );
 
-    if (error) {
-      console.error('Error creating evaluation:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ evaluation: data }, { status: 201 });
+    return NextResponse.json({ evaluation: result.rows[0] }, { status: 201 });
   } catch (error: any) {
     console.error('POST evaluation error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -118,7 +113,7 @@ export async function POST(request: Request) {
 }
 
 // PUT /api/student-evaluations - Update evaluation
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const { id, behavior_rating, participation_rating, homework_rating, notes } = body;
@@ -138,25 +133,15 @@ export async function PUT(request: Request) {
       }
     }
 
-    
-    const { data, error } = await supabase
-      .from('student_evaluations')
-      .update({
-        behavior_rating,
-        participation_rating,
-        homework_rating,
-        notes,
-      })
-      .eq('id', id)
-      .select()
-      .single();
+    const result = await query(
+      `UPDATE student_evaluations
+       SET behavior_rating = $1, participation_rating = $2, homework_rating = $3, notes = $4
+       WHERE id = $5
+       RETURNING *`,
+      [behavior_rating, participation_rating, homework_rating, notes, id]
+    );
 
-    if (error) {
-      console.error('Error updating evaluation:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ evaluation: data });
+    return NextResponse.json({ evaluation: result.rows[0] });
   } catch (error: any) {
     console.error('PUT evaluation error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -164,7 +149,7 @@ export async function PUT(request: Request) {
 }
 
 // DELETE /api/student-evaluations?id=xxx - Delete evaluation
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -173,16 +158,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
-    
-    const { error } = await supabase
-      .from('student_evaluations')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting evaluation:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    await query('DELETE FROM student_evaluations WHERE id = $1', [id]);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

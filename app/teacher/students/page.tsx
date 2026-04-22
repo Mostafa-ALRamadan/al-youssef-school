@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Users } from 'lucide-react';
 import { formatNumber } from '@/utils/number';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 
 interface Student {
   id: string;
@@ -40,13 +40,8 @@ export default function TeacherStudentsPage() {
 
   const loadData = async () => {
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      
       const response = await fetch('/api/teacher/students', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: getAuthHeaders(),
       });
       
       if (response.ok) {

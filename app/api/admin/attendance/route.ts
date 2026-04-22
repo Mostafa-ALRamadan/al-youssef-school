@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AttendanceService, ClassService } from '@/services';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { query } from '@/lib/db';
 
 /**
  * GET /api/admin/attendance?class_id=&date=&semester_id=
@@ -25,30 +25,32 @@ export async function GET(request: NextRequest) {
 
     // Filter by semester if provided - only show lessons with attendance records in that semester
     if (semesterId && attendanceData.lessons) {
-      const supabase = createServerSupabaseClient();
-
       // Get session IDs for this date
       const scheduleIds = attendanceData.lessons.map((l: any) => l.schedule_id).filter(Boolean);
 
       if (scheduleIds.length > 0) {
+        const schedulePlaceholders = scheduleIds.map((_: any, i: number) => `$${i + 1}`).join(',');
+        
         // Find sessions for these schedules on this date
-        const { data: sessions } = await supabase
-          .from('attendance_sessions')
-          .select('id, schedule_id')
-          .in('schedule_id', scheduleIds)
-          .eq('date', date);
-
-        const sessionIds = sessions?.map(s => s.id) || [];
+        const sessionsResult = await query(
+          `SELECT id, schedule_id FROM attendance_sessions 
+           WHERE schedule_id IN (${schedulePlaceholders}) AND date = $${scheduleIds.length + 1}`,
+          [...scheduleIds, date]
+        );
+        const sessions = sessionsResult.rows;
+        const sessionIds = sessions?.map((s: any) => s.id) || [];
 
         if (sessionIds.length > 0) {
+          const sessionPlaceholders = sessionIds.map((_: any, i: number) => `$${i + 2}`).join(',');
+          
           // Check which sessions have records in this semester
-          const { data: records } = await supabase
-            .from('attendance_records')
-            .select('session_id')
-            .in('session_id', sessionIds)
-            .eq('semester_id', semesterId);
-
-          const sessionsWithSemester = new Set(records?.map(r => r.session_id) || []);
+          const recordsResult = await query(
+            `SELECT session_id FROM attendance_records 
+             WHERE session_id IN (${sessionPlaceholders}) AND semester_id = $1`,
+            [semesterId, ...sessionIds]
+          );
+          const records = recordsResult.rows;
+          const sessionsWithSemester = new Set(records?.map((r: any) => r.session_id) || []);
 
           // Filter lessons to only those with attendance in this semester
           attendanceData.lessons = attendanceData.lessons.filter((lesson: any) => {

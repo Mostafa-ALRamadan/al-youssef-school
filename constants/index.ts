@@ -28,8 +28,8 @@ export const SIDEBAR_ITEMS = [
   { id: 'schedule', label: 'البرنامج الأسبوعي', icon: 'Calendar', href: '/admin/schedule' },
   { id: 'complaints', label: 'صندوق الشكاوي', icon: 'MessageSquare', href: '/admin/complaints', requiresMainAdmin: true },
   { id: 'evaluations', label: 'تقييم الطلاب', icon: 'Star', href: '/admin/evaluations' },
+  { id: 'stars-of-the-year', label: 'نجوم السنة', icon: 'Trophy', href: '/admin/stars-of-the-year' },
   { id: 'users', label: 'المستخدمين', icon: 'Users', href: '/admin/users' },
-  { id: 'settings', label: 'إعدادات النظام', icon: 'Settings', href: '/admin/settings', requiresMainAdmin: true },
 ] as const;
 
 export const ADMIN_SIDEBAR_ITEMS = [

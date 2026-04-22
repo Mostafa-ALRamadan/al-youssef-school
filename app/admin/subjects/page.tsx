@@ -90,10 +90,10 @@ export default function SubjectsPage() {
     if (!selectedSubject) return;
     
     try {
-      const response = await fetch('/api/subjects', {
+      const response = await fetch(`/api/subjects/${selectedSubject.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selectedSubject.id, ...formData }),
+        body: JSON.stringify(formData),
       });
       
       if (response.ok) {
@@ -111,7 +111,7 @@ export default function SubjectsPage() {
     if (!selectedSubject) return;
     
     try {
-      const response = await fetch(`/api/subjects?id=${selectedSubject.id}`, {
+      const response = await fetch(`/api/subjects/${selectedSubject.id}`, {
         method: 'DELETE',
       });
       

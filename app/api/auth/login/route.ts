@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/constants';
+import { query } from '@/lib/db';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 
 /**
  * POST /api/auth/login
- * Authenticates a user and returns session data
+ * User login with email and password using JWT
  */
 export async function POST(request: NextRequest) {
   try {
@@ -16,83 +18,107 @@ export async function POST(request: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json(
-        { error: ERROR_MESSAGES.AUTH.INVALID_CREDENTIALS },
+        { error: 'البريد الإلكتروني وكلمة المرور مطلوبان' },
         { status: 400 }
       );
     }
 
-    // Create admin client for session management
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    // Find user by email
+    const userResult = await query(
+      'SELECT id, email, password_hash, name, role, is_main_admin, active_session_id, last_login_at FROM users WHERE email = $1',
+      [email]
+    );
 
-    // First authenticate the user
-    const { data: authData, error: authError } = await adminClient.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (authError || !authData.user) {
+    if (userResult.rows.length === 0) {
       return NextResponse.json(
-        { error: ERROR_MESSAGES.AUTH.INVALID_CREDENTIALS },
+        { error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' },
         { status: 401 }
       );
     }
 
-    // Check if user is admin
-    const { data: userData } = await adminClient
-      .from('users')
-      .select('role')
-      .eq('id', authData.user.id)
-      .single();
-    
+    const user = userResult.rows[0];
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    if (!isPasswordValid) {
+      return NextResponse.json(
+        { error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' },
+        { status: 401 }
+      );
+    }
+
     // If admin, check if already logged in on another device
-    if (userData?.role === 'admin') {
-      // Check if admin already has an active session
-      const { data: currentUserData } = await adminClient
-        .from('users')
-        .select('active_session_id, last_login_at')
-        .eq('id', authData.user.id)
-        .single();
-      
+    if (user.role === 'admin') {
       // If there's an active session recorded and it's recent (within last 30 minutes)
-      // consider the admin as already logged in
       const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-      const hasRecentLogin = currentUserData?.last_login_at && 
-        new Date(currentUserData.last_login_at) > thirtyMinutesAgo;
+      const hasRecentLogin = user.last_login_at && 
+        new Date(user.last_login_at) > thirtyMinutesAgo;
       
-      if (currentUserData?.active_session_id && hasRecentLogin) {
-        // Check if that session is still valid by trying to get user with that session
-        // We sign out the current attempt and block login
-        await adminClient.auth.admin.signOut(authData.user.id, 'global');
-        
+      if (user.active_session_id && hasRecentLogin) {
         return NextResponse.json(
           { error: 'هذا الحساب قيد الاستخدام على جهاز آخر. يرجى تسجيل الخروج من الجهاز الأول أولاً.' },
           { status: 403 }
         );
       }
       
-      // Record this new session as the active one
-      const sessionId = `${authData.user.id}_${Date.now()}`;
-      
-      await adminClient
-        .from('users')
-        .update({
-          active_session_id: sessionId,
-          last_login_at: new Date().toISOString()
-        })
-        .eq('id', authData.user.id);
+      // Record this new session as the active one using a proper UUID
+      const sessionId = uuidv4();
+      await query(
+        'UPDATE users SET active_session_id = $1, last_login_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [sessionId, user.id]
+      );
     }
 
-    // For non-admin users (teachers/parents), allow multiple sessions
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        userId: user.id, 
+        email: user.email, 
+        role: user.role,
+        is_main_admin: user.is_main_admin 
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Update last login for non-admin users
+    if (user.role !== 'admin') {
+      await query(
+        'UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1',
+        [user.id]
+      );
+    }
+
+    // Get additional user data based on role
+    let userData = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      is_main_admin: user.is_main_admin
+    };
+
+    if (user.role === 'teacher') {
+      const teacherResult = await query(
+        'SELECT id, phone, subject_id FROM teachers WHERE user_id = $1',
+        [user.id]
+      );
+      if (teacherResult.rows.length > 0) {
+        userData = { ...userData, ...teacherResult.rows[0] };
+      }
+    }
+
     return NextResponse.json({
       message: SUCCESS_MESSAGES.LOGIN_SUCCESS,
-      user: authData.user,
-      session: authData.session,
+      token,
+      user: userData
     });
+
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { error: ERROR_MESSAGES.AUTH.INVALID_CREDENTIALS },
-      { status: 401 }
+      { error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
+      { status: 500 }
     );
   }
 }

@@ -22,7 +22,18 @@ export const metadata = {
 
 async function getDashboardStats() {
   try {
-    return await DashboardService.getDashboardStats();
+    // Temporarily return default stats until repositories are fully migrated
+    return {
+      totalStudents: 0,
+      totalTeachers: 0,
+      totalClasses: 0,
+      attendanceRate: 0,
+      pendingPayments: 0,
+      newComplaints: 0,
+    };
+    
+    // Original code - commented out until repositories are migrated
+    // return await DashboardService.getDashboardStats();
   } catch {
     return {
       totalStudents: 0,

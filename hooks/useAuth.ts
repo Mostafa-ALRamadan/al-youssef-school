@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { verifyToken } from '@/lib/auth';
 import type { User } from '@/types';
 
 export function useAuth() {
@@ -8,39 +8,30 @@ export function useAuth() {
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const token = localStorage.getItem('auth_token');
       
-      if (authUser) {
-        const { data } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', authUser.id)
-          .single();
-        setUser(data);
+      if (token) {
+        const verifiedUser = verifyToken(token);
+        
+        if (verifiedUser) {
+          // Get user details from our auth/me endpoint
+          const response = await fetch('/api/auth/me', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            const { user: userData } = await response.json();
+            setUser(userData);
+          }
+        }
       }
       
       setLoading(false);
     };
 
     getUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          const { data } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          setUser(data);
-        } else {
-          setUser(null);
-        }
-        setLoading(false);
-      }
-    );
-
-    return () => subscription.unsubscribe();
   }, []);
 
   return { user, loading };

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { SUCCESS_MESSAGES } from '@/constants';
+import { query } from '@/lib/db';
+import jwt from 'jsonwebtoken';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 /**
  * POST /api/auth/logout
@@ -16,34 +16,22 @@ export async function POST(request: NextRequest) {
     const token = authHeader?.replace('Bearer ', '');
     
     if (token) {
-      // Verify token and get user
-      const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-      const { data: { user } } = await adminClient.auth.getUser(token);
-      
-      if (user) {
-        // Check if user is admin
-        const { data: userData } = await adminClient
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
-          .single();
+      try {
+        // Verify JWT token
+        const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string };
         
         // Clear active session tracking for admins
-        if (userData?.role === 'admin') {
-          await adminClient
-            .from('users')
-            .update({
-              active_session_id: null,
-              last_login_at: null
-            })
-            .eq('id', user.id);
+        if (decoded.role === 'admin') {
+          await query(
+            'UPDATE users SET active_session_id = null, last_login_at = null WHERE id = $1',
+            [decoded.userId]
+          );
         }
+      } catch (jwtError) {
+        // Token is invalid, but we still return success for logout
+        console.log('Invalid token during logout:', jwtError);
       }
     }
-
-    // Sign out from Supabase
-    const supabaseClient = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    await supabaseClient.auth.signOut();
 
     return NextResponse.json({
       message: SUCCESS_MESSAGES.LOGOUT_SUCCESS,
@@ -51,7 +39,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Logout error:', error);
     return NextResponse.json(
-      { error: 'حدث خطأ أثناء تسجيل الخروج' },
+      { error: error instanceof Error ? error.message : 'حدث خطأ أثناء تسجيل الخروج' },
       { status: 500 }
     );
   }

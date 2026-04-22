@@ -21,7 +21,7 @@ export interface Parent {
   name: string;
   phone: string;
   address?: string;
-  auth_email?: string; // Internal hidden email for Supabase Auth
+  auth_email?: string;
   created_at: string;
   updated_at: string;
 }
@@ -224,6 +224,22 @@ export interface Grade {
   subject_name?: string;
   semester_name?: string;
   academic_year_name?: string;
+}
+
+export interface ClassTopStudent {
+  id: string;
+  class_id: string;
+  student_id: string;
+  academic_year_id: string;
+  position: 1 | 2 | 3;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+  // Optional joined fields for display
+  student_name?: string;
+  class_name?: string;
+  academic_year_name?: string;
+  total_score?: number;
 }
 
 export interface Announcement {

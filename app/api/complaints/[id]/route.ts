@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { query } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 // PUT /api/complaints/[id] - Update complaint status or add reply
 export async function PUT(
@@ -9,23 +10,28 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const supabase = createServerSupabaseClient();
+
+    // Get authenticated admin user
+    const currentUser = getCurrentUser(request);
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
     // Handle reply update
     if (body.reply !== undefined) {
-      const { data: complaint, error } = await supabase
-        .from('complaints')
-        .update({
-          reply: body.reply,
-          replied_by: body.replied_by,
-          replied_at: new Date().toISOString(),
-          status: 'resolved',
-        })
-        .eq('id', id)
-        .select()
-        .single();
+      const result = await query(
+        `UPDATE complaints 
+         SET reply = $1, replied_by = $2, replied_at = CURRENT_TIMESTAMP, status = 'resolved' 
+         WHERE id = $3 
+         RETURNING *`,
+        [body.reply, currentUser.userId, id]
+      );
 
-      if (error || !complaint) {
+      const complaint = result.rows[0];
+      if (!complaint) {
         return NextResponse.json(
           { error: 'Complaint not found' },
           { status: 404 }
@@ -46,14 +52,34 @@ export async function PUT(
       );
     }
 
-    const { data: complaint, error } = await supabase
-      .from('complaints')
-      .update({ status: body.status })
-      .eq('id', id)
-      .select()
-      .single();
+    // Map Arabic status values to English DB status
+    const statusMap: Record<string, string> = {
+      'معلق': 'pending',
+      'تم المراجعة': 'in_progress',
+      'تم التنفيذ': 'resolved',
+      'مرفوض': 'closed',
+      // Also accept DB values directly
+      'pending': 'pending',
+      'in_progress': 'in_progress',
+      'resolved': 'resolved',
+      'closed': 'closed',
+    };
 
-    if (error || !complaint) {
+    const dbStatus = statusMap[body.status];
+    if (!dbStatus) {
+      return NextResponse.json(
+        { error: 'Invalid status. Must be: معلق, تم المراجعة, تم التنفيذ, or مرفوض' },
+        { status: 400 }
+      );
+    }
+
+    const result = await query(
+      'UPDATE complaints SET status = $1 WHERE id = $2 RETURNING *',
+      [dbStatus, id]
+    );
+
+    const complaint = result.rows[0];
+    if (!complaint) {
       return NextResponse.json(
         { error: 'Complaint not found' },
         { status: 404 }
@@ -80,19 +106,8 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
 
-    const { error } = await supabase
-      .from('complaints')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      return NextResponse.json(
-        { error: 'Failed to delete complaint' },
-        { status: 500 }
-      );
-    }
+    await query('DELETE FROM complaints WHERE id = $1', [id]);
 
     return NextResponse.json({
       message: 'تم حذف الشكوى بنجاح',

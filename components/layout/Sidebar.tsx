@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { SCHOOL_NAME } from '@/constants';
 import { useUser } from '@/components/providers/UserProvider';
+import { getToken, removeToken } from '@/lib/auth-client';
 import Image from 'next/image';
 import {
   LayoutDashboard,
@@ -24,6 +25,7 @@ import {
   CalendarDays,
   MessageSquare,
   Star,
+  Trophy,
   Settings,
   Menu,
   LogOut,
@@ -45,6 +47,7 @@ const iconMap: Record<string, React.ReactNode> = {
   CalendarDays: <CalendarDays className="h-5 w-5" />,
   MessageSquare: <MessageSquare className="h-5 w-5" />,
   Star: <Star className="h-5 w-5" />,
+  Trophy: <Trophy className="h-5 w-5" />,
   Settings: <Settings className="h-5 w-5" />,
 };
 
@@ -64,9 +67,10 @@ interface SidebarProps {
 
 export function Sidebar({ items, userRole, isMainAdmin }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const { userInfo } = useUser();
+  const { userInfo, clearUser } = useUser();
 
   // Use provided isMainAdmin or get from user context
   const actualIsMainAdmin = isMainAdmin !== undefined ? isMainAdmin : userInfo?.is_main_admin;
@@ -79,30 +83,33 @@ export function Sidebar({ items, userRole, isMainAdmin }: SidebarProps) {
 
   const handleLogout = async () => {
     try {
-      const { createClient } = await import('@/lib/supabase');
-      const supabase = createClient();
+      // Get token for the API call
+      const token = getToken();
       
-      // Get current session for the API call
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // Call API to clear admin session tracking
-      if (session?.access_token) {
+      // Call API to clear session tracking
+      if (token) {
         await fetch('/api/auth/logout', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${token}`,
           },
         });
       }
       
-      // Sign out from Supabase client
-      await supabase.auth.signOut();
+      // Clear token from localStorage
+      removeToken();
+      
+      // Clear user state
+      clearUser();
+      
+      // Redirect to login
+      router.push('/login');
     } catch (error) {
       console.error('Logout error:', error);
+      // Still redirect even if there's an error
+      router.push('/login');
     }
-    
-    window.location.href = '/login';
   };
 
   return (

@@ -1,37 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase-server';
+import { query } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 // GET /api/complaints - Get all complaints (admin only)
 export async function GET(request: NextRequest) {
   try {
         
-    // Check if user is admin (optional - for admin access)
-    const authHeader = request.headers.get('authorization');
-    let user = null;
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
-      if (!authError && authUser) {
-        user = authUser;
-      }
-    }
-    
-    // Get complaints without user join for now
-    const { data: complaints, error } = await supabase
-      .from('complaints')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Get complaints with admin replier info only
+    const complaintsResult = await query(`
+      SELECT 
+        c.*,
+        CASE 
+          WHEN c.replied_by IS NOT NULL THEN admin.email
+        END as replier_name
+      FROM complaints c
+      LEFT JOIN users admin ON c.replied_by = admin.id
+      ORDER BY c.created_at DESC
+    `);
 
-    if (error) {
-      console.error('Error fetching complaints:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // Return complaints as-is for now
-    const transformedComplaints = complaints || [];
-
-    return NextResponse.json({ complaints: transformedComplaints });
+    return NextResponse.json({ complaints: complaintsResult.rows });
   } catch (error) {
     console.error('GET /api/complaints error:', error);
     return NextResponse.json(
@@ -41,27 +28,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/complaints - Submit new complaint (authenticated users only)
+// POST /api/complaints - Submit new complaint (parents only)
 export async function POST(request: NextRequest) {
   try {
-        
-    // Get auth token from header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Require authentication
+    const user = getCurrentUser(request);
+    if (!user || user.role !== 'parent') {
       return NextResponse.json(
-        { error: 'يجب تسجيل الدخول لإرسال شكوى' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    
-    // Authenticate user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'يجب تسجيل الدخول لإرسال شكوى' },
+        { error: 'يجب تسجيل الدخول كولي أمر لإرسال شكوى' },
         { status: 401 }
       );
     }
@@ -76,50 +50,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate limiting: Check today's complaints for this user
+    // Rate limiting: 3 complaints per parent per day
     const today = new Date().toISOString().split('T')[0];
+    const countResult = await query(
+      "SELECT COUNT(*) as count FROM complaints WHERE parent_id = $1 AND created_at >= $2 AND created_at < $3",
+      [user.userId, `${today}T00:00:00.000Z`, `${today}T23:59:59.999Z`]
+    );
     
-    const { data: existingComplaints, error: countError } = await supabase
-      .from('complaints')
-      .select('id')
-      .eq('user_id', user.id)
-      .gte('created_at', `${today}T00:00:00.000Z`)
-      .lt('created_at', `${today}T23:59:59.999Z`);
-    
-    if (countError) {
-      console.error('Error checking rate limit:', countError);
+    const dailyCount = parseInt(countResult.rows[0].count);
+    if (dailyCount >= 3) {
       return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      );
-    }
-    
-    // Check rate limit (max 3 per day)
-    if (existingComplaints && existingComplaints.length >= 3) {
-      return NextResponse.json(
-        { error: 'لقد وصلت إلى الحد الأقصى من الشكاوى لهذا اليوم. يمكنك إرسال 3 شكاوى فقط يومياً.' },
+        { error: 'لقد وصلت إلى الحد الأقصى من الشكاوى لهذا اليوم (3 شكاوى). يرجى المحاولة غداً.' },
         { status: 429 }
       );
     }
 
-    // Create complaint
-    const { data: complaint, error: createError } = await supabase
-      .from('complaints')
-      .insert({
-        user_id: user.id,
-        title: body.title,
-        message: body.message,
-      })
-      .select()
-      .single();
-
-    if (createError) {
-      console.error('Error creating complaint:', createError);
-      return NextResponse.json(
-        { error: createError.message || 'Failed to create complaint' },
-        { status: 500 }
-      );
-    }
+    // Create complaint with parent_id
+    const createResult = await query(
+      'INSERT INTO complaints (title, message, status, parent_id) VALUES ($1, $2, $3, $4) RETURNING *',
+      [body.title, body.message, 'pending', user.userId]
+    );
+    const complaint = createResult.rows[0];
 
     return NextResponse.json(
       { message: 'تم إرسال الشكوى بنجاح', complaint },

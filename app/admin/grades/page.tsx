@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/components/ui/use-toast';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ADMIN_SIDEBAR_ITEMS } from '@/constants';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 import { USER_ROLES } from '@/constants';
 import { formatDate } from '@/utils/date';
 import { formatNumber, formatDecimal, formatPercentage, formatFraction, toArabicNumerals } from '@/utils/number';
@@ -19,7 +19,7 @@ import type { Exam, Class, Subject } from '@/types';
 
 // Grade categories based on percentage
 const getGradeCategory = (score: number, maxScore: number): { label: string; color: string } => {
-  const percentage = (score / maxScore) * 100;
+  const percentage = Math.round(((score / maxScore) * 100) * 100) / 100;
 
   if (percentage >= 90) {
     return { label: 'ممتاز', color: 'bg-green-100 text-green-800' };
@@ -495,7 +495,7 @@ export default function AdminGradesPage() {
                         </TableHeader>
                         <TableBody>
                           {examGrades.map((grade) => {
-                            const percentage = (grade.score / (selectedExam?.max_score || 1)) * 100;
+                            const percentage = Math.round(((grade.score / (selectedExam?.max_score || 1)) * 100) * 100) / 100;
                             const category = getGradeCategory(grade.score, selectedExam?.max_score || 1);
                             return (
                               <TableRow key={grade.id}>

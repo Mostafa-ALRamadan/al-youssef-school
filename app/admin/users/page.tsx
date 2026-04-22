@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ADMIN_SIDEBAR_ITEMS, USER_ROLES } from '@/constants';
 import { useToast } from '@/components/ui/use-toast';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 import { useUser } from '@/components/providers/UserProvider';
 import { Input } from '@/components/ui/input';
 import {
@@ -116,20 +116,16 @@ export default function AdminUsersPage() {
     if (!selectedUser) return;
 
     try {
-      // Get session token for authorization
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
       const response = await fetch('/api/admin/users', {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
           id: selectedUser.id,
           email: formData.email,
+          is_parent_account: (selectedUser as any).is_parent_account,
         }),
       });
 
@@ -155,7 +151,10 @@ export default function AdminUsersPage() {
       const response = await fetch(`/api/admin/users/${selectedUser.id}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: newPassword }),
+        body: JSON.stringify({
+          password: newPassword,
+          is_parent_account: (selectedUser as any).is_parent_account,
+        }),
       });
 
       if (response.ok) {
@@ -226,13 +225,15 @@ export default function AdminUsersPage() {
             <Users className="h-8 w-8 text-brand-primary-blue" />
             <h1 className="text-2xl font-bold text-gray-900">إدارة المستخدمين</h1>
           </div>
-          <Button
-            onClick={() => setIsAddDialogOpen(true)}
-            className="bg-brand-primary-blue hover:bg-brand-dark-blue"
-          >
-            <Plus className="h-4 w-4 ml-2" />
-            إضافة مستخدم
-          </Button>
+          {currentUser?.is_main_admin && (
+            <Button
+              onClick={() => setIsAddDialogOpen(true)}
+              className="bg-brand-primary-blue hover:bg-brand-dark-blue"
+            >
+              <Plus className="h-4 w-4 ml-2" />
+              إضافة مستخدم
+            </Button>
+          )}
         </div>
 
         {/* Stats */}

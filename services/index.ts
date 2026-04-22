@@ -1,4 +1,3 @@
-import { supabase } from '@/lib/supabase-server';
 import type { Parent, TeacherAssignment, WeeklySchedule, TimeSlot, AttendanceSession, AttendanceRecord } from '@/types';
 import type { User, DashboardStats, Grade, Announcement, Complaint } from '@/types';
 import {
@@ -19,10 +18,8 @@ import {
   TimeSlotRepository,
   ExamRepository,
 } from '@/repositories';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { query } from '@/lib/db';
+import bcrypt from 'bcrypt';
 
 export class TeacherService {
   static async getAllTeachers() {
@@ -33,29 +30,35 @@ export class TeacherService {
     return await TeacherRepository.findById(id);
   }
 
-  static async createTeacher(teacherData: { email: string; name: string; specialization?: string; phone?: string }) {
-    // First create the user in auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: teacherData.email,
-      password: 'temp_password_123', // Should be generated and sent via email
-      options: {
-        data: {
-          name: teacherData.name,
-          role: 'teacher',
-        },
-      },
-    });
+  static async createTeacher(teacherData: { email: string; name: string; specialization?: string; phone?: string; subject?: string }) {
+    try {
+      // Generate UUID for new user
+      const uuidResult = await query('SELECT gen_random_uuid() as uuid');
+      const userId = uuidResult.rows[0].uuid;
+      
+      // Hash the temporary password
+      const hashedPassword = await bcrypt.hash('temp_password_123', 10);
+      
+      // Create user record in users table
+      await query(
+        'INSERT INTO users (id, email, password_hash, role, name) VALUES ($1, $2, $3, $4, $5)',
+        [userId, teacherData.email, hashedPassword, 'teacher', teacherData.name]
+      );
 
-    if (authError) throw authError;
+      // Then create the teacher record
+      const teacher = await TeacherRepository.create({
+        id: userId,
+        user_id: userId,
+        name: teacherData.name,
+        phone: teacherData.phone,
+        subject: teacherData.subject || teacherData.specialization,
+      });
 
-    // Then create the teacher record
-    const teacher = await TeacherRepository.create({
-      user_id: authData.user!.id,
-      name: teacherData.name,
-      phone: teacherData.phone,
-    });
-
-    return teacher;
+      return teacher;
+    } catch (error) {
+      console.error('Error in TeacherService.createTeacher:', error);
+      throw error;
+    }
   }
 
   static async updateTeacher(id: string, updates: Parameters<typeof TeacherRepository.update>[1]) {
@@ -219,8 +222,8 @@ export class StudentService {
         const oldParent = await ParentRepository.findById(oldParentId);
         if (oldParent && oldParent.user_id) {
           await ParentRepository.delete(oldParent.id);
-          await supabase.from('users').delete().eq('id', oldParent.user_id);
-          await supabase.auth.admin.deleteUser(oldParent.user_id);
+          // Delete from users table
+          await query('DELETE FROM users WHERE id = $1', [oldParent.user_id]);
         }
       }
     }
@@ -250,13 +253,8 @@ export class StudentService {
         if (parent && parent.user_id) {
           // Delete parent record
           await ParentRepository.delete(parent.id);
-          // Delete from public users table
-          await supabase.from('users').delete().eq('id', parent.user_id);
-          // Delete from auth users table
-          const { error: authDeleteError } = await supabase.auth.admin.deleteUser(parent.user_id);
-          if (authDeleteError) {
-            console.error('Auth user deletion error:', authDeleteError);
-          }
+          // Delete from users table
+          await query('DELETE FROM users WHERE id = $1', [parent.user_id]);
         }
       }
     }
@@ -645,12 +643,11 @@ export class GradeService {
     }
 
     // Get active semester
-    const { supabase } = await import('@/lib/supabase-server');
-    const { data: activeSemester } = await supabase
-      .from('semesters')
-      .select('id')
-      .eq('is_active', true)
-      .single();
+    const { query } = await import('@/lib/db');
+    const semesterResult = await query(
+      'SELECT id FROM semesters WHERE is_active = true LIMIT 1'
+    );
+    const activeSemester: { id: string } | null = semesterResult.rows[0] || null;
 
     // Upsert each grade (update if exists, create if not)
     const results = [];

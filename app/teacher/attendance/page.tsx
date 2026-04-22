@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Save, Users, Calendar, BookOpen, ClipboardCheck } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TEACHER_SIDEBAR_ITEMS, USER_ROLES } from '@/constants';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 import { formatDate, formatTime } from '@/utils/date';
 
 interface Lesson {
@@ -75,13 +75,8 @@ export default function TeacherAttendancePage() {
   const loadLessons = async () => {
     try {
       setLoading(true);
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch('/api/teacher/attendance', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -103,13 +98,8 @@ export default function TeacherAttendancePage() {
   const loadStudents = async (lessonId: string) => {
     try {
       setStudentsLoading(true);
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch(`/api/attendance/students?schedule_id=${lessonId}&date=${today}`, {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -159,9 +149,6 @@ export default function TeacherAttendancePage() {
 
     try {
       setSaving(true);
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const records = students.map(student => ({
         student_id: student.id,
         status: attendance[student.id] || 'present',
@@ -171,7 +158,7 @@ export default function TeacherAttendancePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
           session_id: sessionId,

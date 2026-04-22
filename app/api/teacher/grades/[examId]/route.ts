@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ExamService, GradeService } from '@/services';
-import { supabase } from '@/lib/supabase-server';
 
 // GET /api/teacher/grades/[examId] - Get exam details with grades
 export async function GET(

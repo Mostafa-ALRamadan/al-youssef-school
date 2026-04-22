@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AnnouncementService } from '@/services';
-import { supabase } from '@/lib/supabase-server';
+import { getCurrentUser } from '@/lib/auth';
 
 // GET /api/announcements - Get all announcements
 export async function GET(request: NextRequest) {
@@ -25,17 +25,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.substring(7);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const user = getCurrentUser(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const announcement = await AnnouncementService.createAnnouncement({
       ...body,
-      created_by: user.id,
+      created_by: user.userId,
     });
 
     return NextResponse.json(

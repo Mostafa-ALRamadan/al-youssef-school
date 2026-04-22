@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ExamService, GradeService } from '@/services';
-import { supabase } from '@/lib/supabase-server';
+import { query } from '@/lib/db';
 
 // GET /api/admin/grades/[examId] - Get exam details with all grades
 export async function GET(
@@ -19,43 +19,18 @@ export async function GET(
       );
     }
 
-    // Get all grades for this exam with semester info
-    const { data: grades } = await supabase
-      .from('grades')
-      .select(`
-        *,
-        students(name),
-        semesters(name, academic_years(name))
-      `)
-      .eq('exam_id', examId);
-
-    // Batch fetch semesters for better performance
-    const semesterIds = [...new Set(grades?.map(g => g.semester_id).filter(Boolean))];
-    let semestersMap = new Map();
+    // Get all grades for this exam with student and semester info using JOINs
+    const gradesResult = await query(
+      `SELECT g.*, s.name as student_name, sem.name as semester_name, ay.name as academic_year_name
+       FROM grades g
+       LEFT JOIN students s ON g.student_id = s.id
+       LEFT JOIN semesters sem ON g.semester_id = sem.id
+       LEFT JOIN academic_years ay ON sem.academic_year_id = ay.id
+       WHERE g.exam_id = $1`,
+      [examId]
+    );
     
-    if (semesterIds.length > 0) {
-      const { data: semesters } = await supabase
-        .from('semesters')
-        .select('id, name, academic_years(name)')
-        .in('id', semesterIds);
-      
-      // Create a map for quick lookup
-      semesters?.forEach((s: any) => {
-        semestersMap.set(s.id, s);
-      });
-    }
-    
-    // Transform grades with batch-fetched semester info
-    const transformedGrades = grades?.map((g: any) => {
-      const semester = semestersMap.get(g.semester_id);
-      
-      return {
-        ...g,
-        student_name: g.students?.name,
-        semester_name: g.semesters?.name || semester?.name || '-',
-        academic_year_name: g.semesters?.academic_years?.name || (semester as any)?.academic_years?.name || '-',
-      };
-    }) || [];
+    const transformedGrades = gradesResult.rows || [];
 
     return NextResponse.json({ exam: { ...exam, grades: transformedGrades } });
   } catch (error) {

@@ -13,7 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Megaphone, Plus, Pencil, Trash2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ADMIN_SIDEBAR_ITEMS } from '@/constants';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 import type { Announcement } from '@/types';
 import { formatDate } from '@/utils/date';
 import { USER_ROLES } from '@/constants';
@@ -38,13 +38,8 @@ export default function AdminAnnouncementsPage() {
 
   const loadAnnouncements = async () => {
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch('/api/announcements', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -62,14 +57,11 @@ export default function AdminAnnouncementsPage() {
     e.preventDefault();
 
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch('/api/announcements', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
+          ...getAuthHeaders(),
         },
         body: JSON.stringify(formData),
       });
@@ -100,16 +92,17 @@ export default function AdminAnnouncementsPage() {
     if (!editingAnnouncement) return;
 
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch(`/api/announcements/${editingAnnouncement.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
+          ...getAuthHeaders(),
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          title: formData.title,
+          content: formData.content,
+          audience: formData.audience,
+        }),
       });
 
       if (response.ok) {
@@ -138,14 +131,9 @@ export default function AdminAnnouncementsPage() {
     if (!confirm('هل أنت متأكد من حذف هذا الإعلان؟')) return;
 
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch(`/api/announcements/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {

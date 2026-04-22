@@ -28,10 +28,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Search, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Users, Upload, X } from 'lucide-react';
+import Cropper from 'react-easy-crop';
+import Image from 'next/image';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ADMIN_SIDEBAR_ITEMS } from '@/constants';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 import type { Student, Class } from '@/types';
 import { formatDate } from '@/utils/date';
 import { formatNumber } from '@/utils/number';
@@ -44,6 +46,7 @@ type FormData = {
   parent_phone: string;
   date_of_birth: string;
   gender: 'male' | 'female' | '';
+  image_url?: string;
 };
 
 export default function StudentsPage() {
@@ -56,7 +59,7 @@ export default function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   // Form states
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData & { parent_password?: string; parent_address?: string }>({
     name: '',
     class_id: '',
     parent_name: '',
@@ -64,13 +67,22 @@ export default function StudentsPage() {
     parent_phone: '',
     parent_address: '',
     date_of_birth: '',
-    gender: '' as 'male' | 'female' | '',
+    gender: '',
+    image_url: '',
   });
   const [parentSearch, setParentSearch] = useState('');
   const [parentSuggestions, setParentSuggestions] = useState<Student[]>([]);
   const [showParentSuggestions, setShowParentSuggestions] = useState(false);
 
   const [isExistingParent, setIsExistingParent] = useState(false);
+
+  // Image cropper states
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<{x: number, y: number, width: number, height: number} | null>(null);
+  const [isCropping, setIsCropping] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string>('');
 
   // Fetch students and classes
   useEffect(() => {
@@ -80,7 +92,9 @@ export default function StudentsPage() {
 
   const fetchStudents = async () => {
     try {
-      const response = await fetch('/api/students');
+      const response = await fetch('/api/students', {
+        headers: getAuthHeaders(),
+      });
       const data = await response.json();
       if (response.ok) {
         setStudents(data.students || []);
@@ -94,7 +108,9 @@ export default function StudentsPage() {
 
   const fetchClasses = async () => {
     try {
-      const response = await fetch('/api/classes');
+      const response = await fetch('/api/classes', {
+        headers: getAuthHeaders(),
+      });
       const data = await response.json();
       if (response.ok) {
         setClasses(data.classes || []);
@@ -109,7 +125,7 @@ export default function StudentsPage() {
     try {
       const response = await fetch('/api/students', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(formData),
       });
 
@@ -134,7 +150,7 @@ export default function StudentsPage() {
     try {
       const response = await fetch(`/api/students?id=${selectedStudent.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(formData),
       });
 
@@ -156,6 +172,7 @@ export default function StudentsPage() {
     try {
       const response = await fetch(`/api/students?id=${selectedStudent.id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
 
       const data = await response.json();
@@ -173,6 +190,38 @@ export default function StudentsPage() {
   const openEditDialog = (student: Student) => {
     setSelectedStudent(student);
     setParentSearch('');
+    
+    // Format date_of_birth to YYYY-MM-DD for HTML date input
+    // Handle Date objects from API and string formats
+    let formattedDate = '';
+    if (student.date_of_birth) {
+      const dateValue: string | Date = student.date_of_birth as any;
+      console.log('date_of_birth raw:', dateValue, 'type:', typeof dateValue);
+      
+      if (typeof dateValue === 'object' && dateValue !== null && 'getTime' in dateValue) {
+        // Date object from API - format as YYYY-MM-DD using local date components
+        const d = dateValue as Date;
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        formattedDate = `${year}-${month}-${day}`;
+        console.log('Date object formatted:', formattedDate);
+      } else if (typeof dateValue === 'string') {
+        if (dateValue.includes('T')) {
+          // ISO timestamp string - convert to Date then get local date components
+          const d = new Date(dateValue);
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          formattedDate = `${year}-${month}-${day}`;
+        } else {
+          // Already YYYY-MM-DD string format
+          formattedDate = dateValue;
+        }
+        console.log('String formatted:', formattedDate);
+      }
+    }
+    
     setFormData({
       name: student.name,
       class_id: student.class_id || '',
@@ -180,8 +229,9 @@ export default function StudentsPage() {
       parent_password: '',
       parent_phone: student.parent_phone || '',
       parent_address: student.parent_address || '',
-      date_of_birth: student.date_of_birth || '',
+      date_of_birth: formattedDate,
       gender: student.gender || '',
+      image_url: (student as any).image_url || '',
     });
     setIsEditDialogOpen(true);
   };
@@ -226,6 +276,94 @@ export default function StudentsPage() {
     setShowParentSuggestions(false);
   };
 
+  // Calculate new login_name (same logic as backend): Student full name only
+  const calculateLoginName = (studentName: string, _parentName: string): string => {
+    return studentName.trim();
+  };
+
+  // Image handling functions
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        setIsCropping(true);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const onCropComplete = (_croppedArea: any, croppedAreaPixels: {x: number, y: number, width: number, height: number}) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  };
+
+  const createCroppedImage = async (): Promise<Blob | null> => {
+    if (!imagePreview || !croppedAreaPixels) return null;
+
+    const image = new window.Image();
+    image.src = imagePreview;
+    await new Promise((resolve) => { image.onload = resolve; });
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    canvas.width = croppedAreaPixels.width;
+    canvas.height = croppedAreaPixels.height;
+
+    ctx.drawImage(
+      image,
+      croppedAreaPixels.x,
+      croppedAreaPixels.y,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height,
+      0,
+      0,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height
+    );
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
+    });
+  };
+
+  const uploadCroppedImage = async () => {
+    const blob = await createCroppedImage();
+    if (!blob) return;
+
+    // Calculate the new login_name that will be used after saving (student full name)
+    const studentName = formData.name || selectedStudent?.name || 'غير_محدد';
+    const newLoginName = calculateLoginName(studentName, '');
+
+    // Build Arabic filename based on gender and the NEW login_name (same format as PUT)
+    const genderLabel = formData.gender === 'female' ? 'الطالبة' : 'الطالب';
+    const arabicFilename = `صورة_${genderLabel}_${newLoginName}`;
+
+    const uploadFormData = new FormData();
+    uploadFormData.append('file', blob, 'student-image.jpg');
+    uploadFormData.append('type', 'student-image');
+    uploadFormData.append('filename', arabicFilename);
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setFormData(prev => ({ ...prev, image_url: data.url }));
+        setIsCropping(false);
+        setImageFile(null);
+        setImagePreview('');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+    }
+  };
 
   // Convert phone numbers to Arabic numerals
   const formatPhoneNumber = (phone: string | undefined) => {
@@ -306,7 +444,7 @@ export default function StudentsPage() {
                           onClick={() => selectParent(suggestion)}
                         >
                           <div className="font-medium">{suggestion.parent_name}</div>
-                          <div className="text-sm text-gray-500">{formatPhoneNumber(suggestion.parent_phone) || '-'}</div>
+                          <div className="text-sm text-gray-500">{formatPhoneNumber(suggestion.parent_phone)}</div>
                         </button>
                       ))}
                     </div>
@@ -460,7 +598,7 @@ export default function StudentsPage() {
 
         {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="[&>button]:hidden">
+          <DialogContent className="[&>button]:hidden max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>تعديل بيانات الطالب</DialogTitle>
             </DialogHeader>
@@ -576,6 +714,83 @@ export default function StudentsPage() {
                   <option value="female">أنثى</option>
                 </select>
               </div>
+
+              {/* Student Image Upload */}
+              <div className="space-y-2">
+                <Label>صورة الطالب</Label>
+                {isCropping ? (
+                  <div className="relative w-full h-64 bg-gray-900 rounded-lg overflow-hidden">
+                    <Cropper
+                      image={imagePreview}
+                      crop={crop}
+                      zoom={zoom}
+                      aspect={1}
+                      cropShape="round"
+                      onCropChange={setCrop}
+                      onZoomChange={setZoom}
+                      onCropComplete={onCropComplete}
+                    />
+                    <div className="absolute bottom-4 left-4 right-4 flex gap-2 z-10">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setIsCropping(false);
+                          setImageFile(null);
+                          setImagePreview('');
+                        }}
+                        className="flex-1"
+                      >
+                        <X className="h-4 w-4 ml-1" />
+                        إلغاء
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={uploadCroppedImage}
+                        className="flex-1 bg-brand-primary-blue"
+                      >
+                        <Upload className="h-4 w-4 ml-1" />
+                        تأكيد القص
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4">
+                    {formData.image_url ? (
+                      <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-gray-200">
+                        <Image
+                          src={formData.image_url}
+                          alt="صورة الطالب"
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center">
+                        <Users className="h-8 w-8 text-gray-400" />
+                      </div>
+                    )}
+                    <label className="cursor-pointer inline-flex items-center">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageSelect}
+                      />
+                      <span className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
+                        <Upload className="h-4 w-4 ml-1" />
+                        {formData.image_url ? 'تغيير الصورة' : 'رفع صورة'}
+                      </span>
+                    </label>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500">
+                  يمكنك قص الصورة لتناسب شكل دائري
+                </p>
+              </div>
+
               <div className="flex gap-2 justify-end">
                 <Button
                   type="button"

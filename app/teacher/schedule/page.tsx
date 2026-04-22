@@ -20,7 +20,7 @@ import {
 import { Calendar } from 'lucide-react';
 import { formatNumber } from '@/utils/number';
 import { formatTime } from '@/utils/date';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 
 interface WeeklySchedule {
   id: string;
@@ -56,13 +56,8 @@ export default function TeacherSchedulePage() {
 
   const loadData = async () => {
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch('/api/teacher/schedule', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {

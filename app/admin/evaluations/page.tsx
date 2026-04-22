@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Star, Users, Search, Trash2, Filter, Pencil } from 'lucide-react';
-import { createClient } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/auth-client';
 import type { StudentEvaluation } from '@/types';
 import { formatDate } from '@/utils/date';
 import { formatNumber } from '@/utils/number';
@@ -92,8 +92,8 @@ export default function AdminEvaluationsPage() {
   };
 
   useEffect(() => {
-    // Only load evaluations after semester has been initialized and has a value
-    if (isSemesterLoaded && selectedSemester) {
+    // Load evaluations after semester init (empty string means all semesters)
+    if (isSemesterLoaded) {
       loadEvaluations();
     }
   }, [selectedClass, selectedTeacher, selectedSemester, isSemesterLoaded]);

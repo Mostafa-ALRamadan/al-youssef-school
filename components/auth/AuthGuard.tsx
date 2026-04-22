@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase';
+import { verifyToken } from '@/lib/auth';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -10,14 +10,19 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+    const checkAuth = () => {
+      const token = localStorage.getItem('auth_token');
       
-      if (!session) {
+      if (!token) {
         router.push('/login');
       } else {
-        setIsAuthenticated(true);
+        const user = verifyToken(token);
+        if (!user) {
+          localStorage.removeItem('auth_token');
+          router.push('/login');
+        } else {
+          setIsAuthenticated(true);
+        }
       }
       setIsLoading(false);
     };

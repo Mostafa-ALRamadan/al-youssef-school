@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,9 +9,11 @@ import { Button } from '@/components/ui/button';
 import { SCHOOL_NAME, ERROR_MESSAGES } from '@/constants';
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { useUser } from '@/components/providers/UserProvider';
 
 export function LoginForm() {
   const router = useRouter();
+  const { setUserInfo } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,27 +41,24 @@ export function LoginForm() {
         return;
       }
 
-      // Set the Supabase session in the client
-      if (data.session) {
-        await supabase.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
+      // Store JWT token in localStorage for API calls
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+      
+      // Set user info in context immediately
+      if (data.user) {
+        setUserInfo({
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.name,
+          role: data.user.role,
+          is_main_admin: data.user.is_main_admin,
         });
       }
       
-      // Get role from the returned user data
-      let role = data.user?.user_metadata?.role;
-      
-      // If no role in metadata, check the users table
-      if (!role && data.user?.id) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
-        
-        role = userData?.role;
-      }
+      // Get role directly from our JWT API response
+      const role = data.user?.role;
       
       // Redirect based on role
       if (role === 'admin') {

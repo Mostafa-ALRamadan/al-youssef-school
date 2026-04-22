@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/constants';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { query } from '@/lib/db';
 
 /**
  * GET /api/subjects
@@ -8,23 +8,15 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: subjects, error } = await supabase
-      .from('subjects')
-      .select('*')
-      .order('name', { ascending: true });
+    const result = await query(
+      'SELECT * FROM subjects ORDER BY name ASC'
+    );
     
-    if (error) {
-      return NextResponse.json(
-        { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
-        { status: 500 }
-      );
-    }
-    
-    return NextResponse.json({ subjects });
+    return NextResponse.json({ subjects: result.rows });
   } catch (error) {
+    console.error('Error fetching subjects:', error);
     return NextResponse.json(
-      { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
+      { error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
       { status: 500 }
     );
   }
@@ -46,24 +38,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
-    const { data: newSubject, error } = await supabase
-      .from('subjects')
-      .insert({ name })
-      .select()
-      .single();
+    const result = await query(
+      'INSERT INTO subjects (name) VALUES ($1) RETURNING *',
+      [name]
+    );
 
-    if (error) {
-      return NextResponse.json(
-        { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ subject: newSubject, message: SUCCESS_MESSAGES.CREATED });
+    return NextResponse.json({ 
+      subject: result.rows[0], 
+      message: SUCCESS_MESSAGES.CREATED 
+    });
   } catch (error) {
+    console.error('Error creating subject:', error);
     return NextResponse.json(
-      { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
+      { error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
       { status: 500 }
     );
   }
@@ -85,28 +72,26 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const updates: { name?: string } = {};
-    if (name !== undefined) updates.name = name;
-
-    const supabase = createServerSupabaseClient();
-    const { data: updatedSubject, error } = await supabase
-      .from('subjects')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
+    if (!name) {
       return NextResponse.json(
-        { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
-        { status: 500 }
+        { error: 'اسم المادة مطلوب' },
+        { status: 400 }
       );
     }
 
-    return NextResponse.json({ subject: updatedSubject, message: SUCCESS_MESSAGES.UPDATED });
+    const result = await query(
+      'UPDATE subjects SET name = $1 WHERE id = $2 RETURNING *',
+      [name, id]
+    );
+
+    return NextResponse.json({ 
+      subject: result.rows[0], 
+      message: SUCCESS_MESSAGES.UPDATED 
+    });
   } catch (error) {
+    console.error('Error updating subject:', error);
     return NextResponse.json(
-      { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
+      { error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
       { status: 500 }
     );
   }
@@ -128,23 +113,13 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
-    const { error } = await supabase
-      .from('subjects')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      return NextResponse.json(
-        { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
-        { status: 500 }
-      );
-    }
+    await query('DELETE FROM subjects WHERE id = $1', [id]);
 
     return NextResponse.json({ message: SUCCESS_MESSAGES.DELETED });
   } catch (error) {
+    console.error('Error deleting subject:', error);
     return NextResponse.json(
-      { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
+      { error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
       { status: 500 }
     );
   }

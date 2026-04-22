@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase';
+import { getToken } from '@/lib/auth-client';
 import { LoginForm } from '@/components/auth/LoginForm';
 
 export default function LoginPage() {
@@ -13,28 +13,30 @@ export default function LoginPage() {
   useEffect(() => {
     const checkExistingSession = async () => {
       try {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
+        const token = getToken();
         
-        if (session) {
-          // Get user role to determine dashboard
-          const { data: profile } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', session.user.id)
-            .single();
+        if (token) {
+          // Verify token and get user role
+          const response = await fetch('/api/auth/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
           
-          // Redirect based on role
-          if (profile?.role === 'admin') {
-            router.push('/admin/dashboard');
-          } else if (profile?.role === 'teacher' || profile?.role === 'authenticated') {
-            router.push('/teacher/dashboard');
+          if (response.ok) {
+            const { user } = await response.json();
+            
+            // Redirect based on role
+            if (user?.role === 'admin') {
+              router.push('/admin/dashboard');
+            } else if (user?.role === 'teacher') {
+              router.push('/teacher/dashboard');
+            } else {
+              setShowLogin(true);
+            }
           } else {
-            // Fallback to login if role is unknown
             setShowLogin(true);
           }
         } else {
-          // No session, show login form
+          // No token, show login form
           setShowLogin(true);
         }
       } catch (error) {

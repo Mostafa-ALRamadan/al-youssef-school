@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { createClient } from '@/lib/supabase';
 
 interface RoleGuardProps {
   children: React.ReactNode;
@@ -17,26 +16,36 @@ export function RoleGuard({ children, allowedRoles, redirectTo = '/login' }: Rol
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+    
     const checkRole = async () => {
       try {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
+        const token = localStorage.getItem('auth_token');
         
-        if (!session) {
+        if (!token) {
           router.push(redirectTo as any);
           return;
         }
 
-        // Get user role from database
-        const { data: profile } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
+        // Verify token and get user info from server-side API
+        // This is more secure than client-side JWT verification
+        const response = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
 
-        const userRole = profile?.role;
-        
-        if (!userRole || !allowedRoles.includes(userRole)) {
+        if (!response.ok) {
+          localStorage.removeItem('auth_token');
+          router.push(redirectTo as any);
+          return;
+        }
+
+        const { user } = await response.json();
+
+        // Check if user role is allowed
+        if (!allowedRoles.includes(user.role)) {
           router.push(redirectTo as any);
           return;
         }

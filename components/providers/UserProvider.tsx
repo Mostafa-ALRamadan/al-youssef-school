@@ -1,7 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { createClient } from '@/lib/supabase';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 interface UserInfo {
   id: string;
@@ -15,12 +14,16 @@ interface UserContextType {
   userInfo: UserInfo | null;
   loading: boolean;
   refreshUser: () => Promise<void>;
+  clearUser: () => void;
+  setUserInfo: (user: UserInfo) => void;
 }
 
 const UserContext = createContext<UserContextType>({
   userInfo: null,
   loading: true,
   refreshUser: async () => {},
+  clearUser: () => {},
+  setUserInfo: () => {},
 });
 
 export function UserProvider({ children }: { children: ReactNode }) {
@@ -29,38 +32,27 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const fetchUserInfo = async () => {
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = localStorage.getItem('auth_token');
       
-      if (session?.user) {
-        // Use session data immediately (no loading flash)
-        const sessionEmail = session.user.email || '';
-        
-        // Fetch profile in background for role, name, and main admin status
-        const { data: profile } = await supabase
-          .from('users')
-          .select('id, email, role, is_main_admin')
-          .eq('id', session.user.id)
-          .single();
-
-        // For display name, fetch from role tables
-        let displayName = null;
-        if (profile?.role === 'teacher') {
-          const { data: teacher } = await supabase
-            .from('teachers')
-            .select('name')
-            .eq('user_id', session.user.id)
-            .single();
-          displayName = teacher?.name;
-        }
-
-        setUserInfo({
-          id: session.user.id,
-          email: profile?.email || sessionEmail,
-          name: displayName,
-          role: profile?.role || 'authenticated',
-          is_main_admin: profile?.is_main_admin,
+      if (token) {
+        // Skip client-side verification, let server verify the token
+        const response = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
+        
+        if (response.ok) {
+          const { user: userData } = await response.json();
+          
+          setUserInfo({
+            id: userData.id,
+            email: userData.email,
+            name: userData.name,
+            role: userData.role,
+            is_main_admin: userData.is_main_admin,
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching user info:', error);
@@ -73,8 +65,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
     fetchUserInfo();
   }, []);
 
+  const clearUser = () => {
+    setUserInfo(null);
+  };
+
+  const setUserInfoWrapper = (user: UserInfo) => {
+    setUserInfo(user);
+  };
+
   return (
-    <UserContext.Provider value={{ userInfo, loading, refreshUser: fetchUserInfo }}>
+    <UserContext.Provider value={{ userInfo, loading, refreshUser: fetchUserInfo, clearUser, setUserInfo: setUserInfoWrapper }}>
       {children}
     </UserContext.Provider>
   );

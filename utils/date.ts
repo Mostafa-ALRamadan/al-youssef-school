@@ -11,20 +11,36 @@ export const toArabicNumerals = (num: number | string): string => {
 
 // Format date as YYYY/MM/DD with Arabic numerals (for RTL display)
 export const formatDate = (date: string | Date): string => {
-  const d = new Date(date);
-  const day = d.getDate();
-  const month = d.getMonth() + 1;
-  const year = d.getFullYear();
+  let year: number, month: number, day: number;
+  
+  if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    // Date-only string YYYY-MM-DD - parse manually to avoid timezone issues
+    [year, month, day] = date.split('-').map(Number);
+  } else {
+    // ISO timestamp or Date object - use Date constructor
+    const d = new Date(date);
+    day = d.getDate();
+    month = d.getMonth() + 1;
+    year = d.getFullYear();
+  }
   
   return `${toArabicNumerals(year)}/${toArabicNumerals(month)}/${toArabicNumerals(day)}`;
 };
 
 // Alternative format: DD/MM/YYYY (if needed)
 export const formatDateLTR = (date: string | Date): string => {
-  const d = new Date(date);
-  const day = d.getDate();
-  const month = d.getMonth() + 1;
-  const year = d.getFullYear();
+  let year: number, month: number, day: number;
+  
+  if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    // Date-only string YYYY-MM-DD - parse manually to avoid timezone issues
+    [year, month, day] = date.split('-').map(Number);
+  } else {
+    // ISO timestamp or Date object - use Date constructor
+    const d = new Date(date);
+    day = d.getDate();
+    month = d.getMonth() + 1;
+    year = d.getFullYear();
+  }
   
   return `${toArabicNumerals(day)}/${toArabicNumerals(month)}/${toArabicNumerals(year)}`;
 };

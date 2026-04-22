@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/constants';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { query } from '@/lib/db';
 
 /**
  * GET /api/classes
@@ -8,23 +8,15 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: classes, error } = await supabase
-      .from('classes')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const result = await query(
+      'SELECT * FROM classes ORDER BY created_at DESC'
+    );
     
-    if (error) {
-      return NextResponse.json(
-        { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
-        { status: 500 }
-      );
-    }
-    
-    return NextResponse.json({ classes });
+    return NextResponse.json({ classes: result.rows });
   } catch (error) {
+    console.error('Error fetching classes:', error);
     return NextResponse.json(
-      { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
+      { error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
       { status: 500 }
     );
   }
@@ -46,24 +38,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
-    const { data: newClass, error } = await supabase
-      .from('classes')
-      .insert({ name })
-      .select()
-      .single();
+    const result = await query(
+      'INSERT INTO classes (name) VALUES ($1) RETURNING *',
+      [name]
+    );
 
-    if (error) {
-      return NextResponse.json(
-        { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ class: newClass, message: SUCCESS_MESSAGES.CREATED });
+    return NextResponse.json({ 
+      class: result.rows[0], 
+      message: SUCCESS_MESSAGES.CREATED 
+    });
   } catch (error) {
+    console.error('Error creating class:', error);
     return NextResponse.json(
-      { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
+      { error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
       { status: 500 }
     );
   }
@@ -85,28 +72,26 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const updates: { name?: string } = {};
-    if (name) updates.name = name;
-
-    const supabase = createServerSupabaseClient();
-    const { data: updatedClass, error } = await supabase
-      .from('classes')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
+    if (!name) {
       return NextResponse.json(
-        { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
-        { status: 500 }
+        { error: 'اسم الصف مطلوب' },
+        { status: 400 }
       );
     }
 
-    return NextResponse.json({ class: updatedClass, message: SUCCESS_MESSAGES.UPDATED });
+    const result = await query(
+      'UPDATE classes SET name = $1 WHERE id = $2 RETURNING *',
+      [name, id]
+    );
+
+    return NextResponse.json({ 
+      class: result.rows[0], 
+      message: SUCCESS_MESSAGES.UPDATED 
+    });
   } catch (error) {
+    console.error('Error updating class:', error);
     return NextResponse.json(
-      { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
+      { error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
       { status: 500 }
     );
   }
@@ -128,23 +113,13 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
-    const { error } = await supabase
-      .from('classes')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      return NextResponse.json(
-        { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
-        { status: 500 }
-      );
-    }
+    await query('DELETE FROM classes WHERE id = $1', [id]);
 
     return NextResponse.json({ message: SUCCESS_MESSAGES.DELETED });
   } catch (error) {
+    console.error('Error deleting class:', error);
     return NextResponse.json(
-      { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
+      { error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
       { status: 500 }
     );
   }

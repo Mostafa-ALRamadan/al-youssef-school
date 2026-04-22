@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AnnouncementService } from '@/services';
-import { supabase } from '@/lib/supabase-server';
+import { getCurrentUser } from '@/lib/auth';
 
 // PUT /api/announcements/[id] - Update announcement
 export async function PUT(
@@ -14,10 +14,9 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.substring(7);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const user = getCurrentUser(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -57,10 +56,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.substring(7);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const user = getCurrentUser(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
