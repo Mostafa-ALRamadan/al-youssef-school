@@ -6,8 +6,13 @@ import type {
   Teacher,
   Class,
   Subject,
+  AcademicYear,
+  Semester,
   Announcement,
   Payment,
+  StudentFee,
+  FeePayment,
+  PaymentSummary,
   Schedule,
   Complaint,
   DashboardStats,
@@ -20,6 +25,7 @@ import type {
   LessonAttendance,
   Exam,
   Grade,
+  News,
 } from '@/types';
 
 export class UserRepository {
@@ -401,10 +407,10 @@ export class ClassRepository {
 
   static async create(classData: Partial<Class> & Record<string, any>): Promise<Class | null> {
     try {
-      const { id, name, grade_level, status } = classData;
+      const { name } = classData;
       const result = await query(
-        'INSERT INTO classes (id, name, grade_level, status) VALUES ($1, $2, $3, $4) RETURNING *',
-        [id, name, grade_level, status || 'active']
+        'INSERT INTO classes (name) VALUES ($1) RETURNING *',
+        [name]
       );
       return result.rows[0] as Class;
     } catch (error) {
@@ -415,10 +421,10 @@ export class ClassRepository {
 
   static async update(id: string, updates: Partial<Class> & Record<string, any>): Promise<Class | null> {
     try {
-      const { name, grade_level, status } = updates;
+      const { name } = updates;
       const result = await query(
-        'UPDATE classes SET name = $1, grade_level = $2, status = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
-        [name, grade_level, status, id]
+        'UPDATE classes SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+        [name, id]
       );
       return result.rows[0] as Class || null;
     } catch (error) {
@@ -725,33 +731,274 @@ export class AttendanceRepository {
   }
 }
 
-export class PaymentRepository {
-  static async findAll(): Promise<Payment[]> {
+export class StudentFeeRepository {
+  static async findAll(): Promise<StudentFee[]> {
     try {
-      const result = await query('SELECT * FROM payments ORDER BY due_date ASC');
-      return result.rows as Payment[];
+      const result = await query(`
+        SELECT 
+          sf.*,
+          s.name as student_name,
+          ay.name as academic_year_name
+        FROM student_fees sf
+        LEFT JOIN students s ON sf.student_id = s.id
+        LEFT JOIN academic_years ay ON sf.academic_year_id = ay.id
+        ORDER BY s.name ASC
+      `);
+      return result.rows as StudentFee[];
     } catch (error) {
-      console.error('Error in PaymentRepository.findAll:', error);
+      console.error('Error in StudentFeeRepository.findAll:', error);
       return [];
     }
   }
 
-  static async findPending(): Promise<Payment[]> {
+  static async findById(id: string): Promise<StudentFee | null> {
     try {
-      const result = await query('SELECT * FROM payments WHERE is_paid = false ORDER BY due_date ASC');
-      return result.rows as Payment[];
+      const result = await query(`
+        SELECT 
+          sf.*,
+          s.name as student_name,
+          ay.name as academic_year_name
+        FROM student_fees sf
+        LEFT JOIN students s ON sf.student_id = s.id
+        LEFT JOIN academic_years ay ON sf.academic_year_id = ay.id
+        WHERE sf.id = $1
+      `, [id]);
+      return result.rows[0] as StudentFee || null;
     } catch (error) {
-      console.error('Error in PaymentRepository.findPending:', error);
+      console.error('Error in StudentFeeRepository.findById:', error);
+      return null;
+    }
+  }
+
+  static async findByStudentId(studentId: string): Promise<StudentFee[]> {
+    try {
+      const result = await query(`
+        SELECT 
+          sf.*,
+          s.name as student_name,
+          ay.name as academic_year_name
+        FROM student_fees sf
+        LEFT JOIN students s ON sf.student_id = s.id
+        LEFT JOIN academic_years ay ON sf.academic_year_id = ay.id
+        WHERE sf.student_id = $1
+        ORDER BY ay.start_date DESC
+      `, [studentId]);
+      return result.rows as StudentFee[];
+    } catch (error) {
+      console.error('Error in StudentFeeRepository.findByStudentId:', error);
       return [];
     }
   }
 
-  static async countPending(): Promise<number> {
+  static async findByStudentAndYear(studentId: string, academicYearId: string): Promise<StudentFee | null> {
     try {
-      const result = await query('SELECT COUNT(*) FROM payments WHERE is_paid = false');
-      return parseInt(result.rows[0].count, 10) || 0;
+      const result = await query(`
+        SELECT 
+          sf.*,
+          s.name as student_name,
+          ay.name as academic_year_name
+        FROM student_fees sf
+        LEFT JOIN students s ON sf.student_id = s.id
+        LEFT JOIN academic_years ay ON sf.academic_year_id = ay.id
+        WHERE sf.student_id = $1 AND sf.academic_year_id = $2
+      `, [studentId, academicYearId]);
+      return result.rows[0] as StudentFee || null;
     } catch (error) {
-      console.error('Error in PaymentRepository.countPending:', error);
+      console.error('Error in StudentFeeRepository.findByStudentAndYear:', error);
+      return null;
+    }
+  }
+
+  static async create(data: Omit<StudentFee, 'id' | 'created_at' | 'updated_at'>): Promise<StudentFee | null> {
+    try {
+      const result = await query(
+        `INSERT INTO student_fees (student_id, academic_year_id, school_fee, transport_fee, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, timezone('utc', now()), timezone('utc', now()))
+         RETURNING *`,
+        [data.student_id, data.academic_year_id, data.school_fee, data.transport_fee]
+      );
+      return result.rows[0] as StudentFee;
+    } catch (error) {
+      console.error('Error in StudentFeeRepository.create:', error);
+      return null;
+    }
+  }
+
+  static async update(id: string, data: Partial<Omit<StudentFee, 'id' | 'created_at' | 'updated_at'>>): Promise<StudentFee | null> {
+    try {
+      const result = await query(
+        `UPDATE student_fees 
+         SET school_fee = COALESCE($2, school_fee), 
+             transport_fee = COALESCE($3, transport_fee),
+             updated_at = timezone('utc', now())
+         WHERE id = $1
+         RETURNING *`,
+        [id, data.school_fee, data.transport_fee]
+      );
+      return result.rows[0] as StudentFee || null;
+    } catch (error) {
+      console.error('Error in StudentFeeRepository.update:', error);
+      return null;
+    }
+  }
+
+  static async delete(id: string): Promise<boolean> {
+    try {
+      const result = await query('DELETE FROM student_fees WHERE id = $1', [id]);
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error in StudentFeeRepository.delete:', error);
+      return false;
+    }
+  }
+
+  static async getFinancialSummary(): Promise<PaymentSummary> {
+    try {
+      const result = await query(`
+        SELECT 
+          COALESCE(SUM(school_fee + transport_fee), 0) as total_fees,
+          COUNT(DISTINCT student_id) as student_count
+        FROM student_fees
+      `);
+      
+      const totalFees = parseFloat(result.rows[0]?.total_fees || 0);
+      
+      // Get total paid from fee_payments
+      const paymentsResult = await query(`
+        SELECT COALESCE(SUM(amount), 0) as total_paid
+        FROM fee_payments
+      `);
+      
+      const totalPaid = parseFloat(paymentsResult.rows[0]?.total_paid || 0);
+      
+      return {
+        total_fees: totalFees,
+        total_paid: totalPaid,
+        total_remaining: totalFees - totalPaid,
+        student_count: parseInt(result.rows[0]?.student_count || 0)
+      };
+    } catch (error) {
+      console.error('Error in StudentFeeRepository.getFinancialSummary:', error);
+      return { total_fees: 0, total_paid: 0, total_remaining: 0, student_count: 0 };
+    }
+  }
+}
+
+export class FeePaymentRepository {
+  static async findAll(): Promise<FeePayment[]> {
+    try {
+      const result = await query(`
+        SELECT 
+          fp.*,
+          s.name as student_name,
+          u.name as created_by_name
+        FROM fee_payments fp
+        LEFT JOIN student_fees sf ON fp.student_fee_id = sf.id
+        LEFT JOIN students s ON sf.student_id = s.id
+        LEFT JOIN users u ON fp.created_by = u.id
+        ORDER BY fp.payment_date DESC
+      `);
+      return result.rows as FeePayment[];
+    } catch (error) {
+      console.error('Error in FeePaymentRepository.findAll:', error);
+      return [];
+    }
+  }
+
+  static async findByStudentFeeId(studentFeeId: string): Promise<FeePayment[]> {
+    try {
+      const result = await query(`
+        SELECT 
+          fp.*,
+          s.name as student_name,
+          u.name as created_by_name
+        FROM fee_payments fp
+        LEFT JOIN student_fees sf ON fp.student_fee_id = sf.id
+        LEFT JOIN students s ON sf.student_id = s.id
+        LEFT JOIN users u ON fp.created_by = u.id
+        WHERE fp.student_fee_id = $1
+        ORDER BY fp.payment_date DESC
+      `, [studentFeeId]);
+      return result.rows as FeePayment[];
+    } catch (error) {
+      console.error('Error in FeePaymentRepository.findByStudentFeeId:', error);
+      return [];
+    }
+  }
+
+  static async findById(id: string): Promise<FeePayment | null> {
+    try {
+      const result = await query(`
+        SELECT 
+          fp.*,
+          s.name as student_name,
+          u.name as created_by_name
+        FROM fee_payments fp
+        LEFT JOIN student_fees sf ON fp.student_fee_id = sf.id
+        LEFT JOIN students s ON sf.student_id = s.id
+        LEFT JOIN users u ON fp.created_by = u.id
+        WHERE fp.id = $1
+      `, [id]);
+      return result.rows[0] as FeePayment || null;
+    } catch (error) {
+      console.error('Error in FeePaymentRepository.findById:', error);
+      return null;
+    }
+  }
+
+  static async create(data: Omit<FeePayment, 'id' | 'created_at'>): Promise<FeePayment | null> {
+    try {
+      const result = await query(
+        `INSERT INTO fee_payments (student_fee_id, amount, payment_date, payment_method, notes, created_by, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, timezone('utc', now()))
+         RETURNING *`,
+        [data.student_fee_id, data.amount, data.payment_date, data.payment_method, data.notes, data.created_by]
+      );
+      return result.rows[0] as FeePayment;
+    } catch (error) {
+      console.error('Error in FeePaymentRepository.create:', error);
+      return null;
+    }
+  }
+
+  static async update(id: string, data: Partial<Omit<FeePayment, 'id' | 'created_at'>>): Promise<FeePayment | null> {
+    try {
+      const result = await query(
+        `UPDATE fee_payments 
+         SET amount = COALESCE($2, amount),
+             payment_date = COALESCE($3, payment_date),
+             payment_method = COALESCE($4, payment_method),
+             notes = COALESCE($5, notes)
+         WHERE id = $1
+         RETURNING *`,
+        [id, data.amount, data.payment_date, data.payment_method, data.notes]
+      );
+      return result.rows[0] as FeePayment || null;
+    } catch (error) {
+      console.error('Error in FeePaymentRepository.update:', error);
+      return null;
+    }
+  }
+
+  static async delete(id: string): Promise<boolean> {
+    try {
+      const result = await query('DELETE FROM fee_payments WHERE id = $1', [id]);
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error in FeePaymentRepository.delete:', error);
+      return false;
+    }
+  }
+
+  static async getTotalPaidByStudentFeeId(studentFeeId: string): Promise<number> {
+    try {
+      const result = await query(
+        'SELECT COALESCE(SUM(amount), 0) as total FROM fee_payments WHERE student_fee_id = $1',
+        [studentFeeId]
+      );
+      return parseFloat(result.rows[0]?.total || 0);
+    } catch (error) {
+      console.error('Error in FeePaymentRepository.getTotalPaidByStudentFeeId:', error);
       return 0;
     }
   }
@@ -1074,16 +1321,19 @@ export class TimeSlotRepository {
 
 export class DashboardRepository {
   static async getStats(): Promise<DashboardStats> {
-    const [totalStudents, totalTeachers, totalClasses, pendingPayments, newComplaints] = 
+    const [totalStudents, totalTeachers, totalClasses, newComplaints] = 
       await Promise.all([
         StudentRepository.count(),
         TeacherRepository.count(),
         ClassRepository.count(),
-        PaymentRepository.countPending(),
         ComplaintRepository.countNew(),
       ]);
 
     const attendanceRate = await AttendanceRepository.getTodayAttendanceRate();
+
+    // Get financial summary for pending payments calculation
+    const financialSummary = await StudentFeeRepository.getFinancialSummary();
+    const pendingPayments = financialSummary.total_remaining > 0 ? 1 : 0;
 
     return {
       totalStudents,
@@ -1403,7 +1653,16 @@ export class AnnouncementRepository {
 export class ComplaintRepository {
   static async findAll(): Promise<Complaint[]> {
     try {
-      const result = await query('SELECT * FROM complaints ORDER BY created_at DESC');
+      const result = await query(`
+        SELECT 
+          c.*,
+          CASE 
+            WHEN c.replied_by IS NOT NULL THEN admin.email
+          END as replier_name
+        FROM complaints c
+        LEFT JOIN users admin ON c.replied_by = admin.id
+        ORDER BY c.created_at DESC
+      `);
       return result.rows as Complaint[];
     } catch (error) {
       console.error('Error in ComplaintRepository.findAll:', error);
@@ -1421,12 +1680,11 @@ export class ComplaintRepository {
     }
   }
 
-  static async create(complaint: Omit<Complaint, 'id' | 'created_at' | 'status'> & Record<string, any>): Promise<Complaint | null> {
+  static async create(title: string, message: string, parentId: string): Promise<Complaint | null> {
     try {
-      const { title, message } = complaint;
       const result = await query(
-        "INSERT INTO complaints (title, message, status) VALUES ($1, $2, 'pending') RETURNING *",
-        [title, message]
+        'INSERT INTO complaints (title, message, status, parent_id) VALUES ($1, $2, $3, $4) RETURNING *',
+        [title, message, 'pending', parentId]
       );
       return result.rows[0] as Complaint;
     } catch (error) {
@@ -1435,10 +1693,24 @@ export class ComplaintRepository {
     }
   }
 
+  static async getDailyCount(parentId: string): Promise<number> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const result = await query(
+        "SELECT COUNT(*) as count FROM complaints WHERE parent_id = $1 AND created_at >= $2 AND created_at < $3",
+        [parentId, `${today}T00:00:00.000Z`, `${today}T23:59:59.999Z`]
+      );
+      return parseInt(result.rows[0].count);
+    } catch (error) {
+      console.error('Error in ComplaintRepository.getDailyCount:', error);
+      return 0;
+    }
+  }
+
   static async updateStatus(id: string, status: string): Promise<Complaint | null> {
     try {
       const result = await query(
-        'UPDATE complaints SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+        'UPDATE complaints SET status = $1 WHERE id = $2 RETURNING *',
         [status, id]
       );
       return result.rows[0] as Complaint || null;
@@ -1458,10 +1730,10 @@ export class ComplaintRepository {
     }
   }
 
-  static async addReply(id: string, reply: string, replied_by?: string): Promise<Complaint | null> {
+  static async addReply(id: string, reply: string, replied_by: string): Promise<Complaint | null> {
     try {
       const result = await query(
-        "UPDATE complaints SET reply = $1, replied_at = CURRENT_TIMESTAMP, replied_by = $2, status = 'reviewed', updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *",
+        "UPDATE complaints SET reply = $1, replied_by = $2, replied_at = CURRENT_TIMESTAMP, status = 'resolved' WHERE id = $3 RETURNING *",
         [reply, replied_by, id]
       );
       return result.rows[0] as Complaint || null;
@@ -1478,6 +1750,343 @@ export class ComplaintRepository {
     } catch (error) {
       console.error('Error in ComplaintRepository.countNew:', error);
       return 0;
+    }
+  }
+}
+
+export class NewsRepository {
+  static async findAll(publishedOnly: boolean = false): Promise<News[]> {
+    try {
+      let sql = 'SELECT * FROM news';
+      if (publishedOnly) {
+        sql += ' WHERE is_published = true';
+      }
+      sql += ' ORDER BY is_pinned DESC, created_at DESC';
+      const result = await query(sql);
+      return result.rows as News[];
+    } catch (error) {
+      console.error('Error in NewsRepository.findAll:', error);
+      return [];
+    }
+  }
+
+  static async findById(id: string, publishedOnly: boolean = false): Promise<News | null> {
+    try {
+      let sql = 'SELECT * FROM news WHERE id = $1';
+      const params: any[] = [id];
+      if (publishedOnly) {
+        sql += ' AND is_published = true';
+      }
+      const result = await query(sql, params);
+      return result.rows[0] as News || null;
+    } catch (error) {
+      console.error('Error in NewsRepository.findById:', error);
+      return null;
+    }
+  }
+
+  static async create(news: Omit<News, 'id' | 'created_at' | 'updated_at'> & Record<string, any>): Promise<News | null> {
+    try {
+      const { title, summary, content, image_url, is_published, is_pinned } = news;
+      const result = await query(
+        `INSERT INTO news (title, summary, content, image_url, is_published, is_pinned, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         RETURNING *`,
+        [title, summary || null, content, image_url || null, is_published ?? true, is_pinned ?? false]
+      );
+      return result.rows[0] as News;
+    } catch (error) {
+      console.error('Error in NewsRepository.create:', error);
+      return null;
+    }
+  }
+
+  static async update(id: string, news: Partial<News> & Record<string, any>): Promise<News | null> {
+    try {
+      const updateFields: string[] = [];
+      const updateValues: any[] = [];
+      let paramIndex = 1;
+
+      if (news.title !== undefined) {
+        updateFields.push(`title = $${paramIndex++}`);
+        updateValues.push(news.title);
+      }
+      if (news.summary !== undefined) {
+        updateFields.push(`summary = $${paramIndex++}`);
+        updateValues.push(news.summary);
+      }
+      if (news.content !== undefined) {
+        updateFields.push(`content = $${paramIndex++}`);
+        updateValues.push(news.content);
+      }
+      if (news.image_url !== undefined) {
+        updateFields.push(`image_url = $${paramIndex++}`);
+        updateValues.push(news.image_url);
+      }
+      if (news.is_published !== undefined) {
+        updateFields.push(`is_published = $${paramIndex++}`);
+        updateValues.push(news.is_published);
+      }
+      if (news.is_pinned !== undefined) {
+        updateFields.push(`is_pinned = $${paramIndex++}`);
+        updateValues.push(news.is_pinned);
+      }
+
+      if (updateFields.length === 0) {
+        return null;
+      }
+
+      updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+      updateValues.push(id);
+
+      const result = await query(
+        `UPDATE news SET ${updateFields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+        updateValues
+      );
+      return result.rows[0] as News || null;
+    } catch (error) {
+      console.error('Error in NewsRepository.update:', error);
+      return null;
+    }
+  }
+
+  static async delete(id: string): Promise<boolean> {
+    try {
+      const result = await query('DELETE FROM news WHERE id = $1 RETURNING *', [id]);
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error in NewsRepository.delete:', error);
+      return false;
+    }
+  }
+
+  static async togglePin(id: string): Promise<News | null> {
+    try {
+      const result = await query(
+        'UPDATE news SET is_pinned = NOT is_pinned, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
+        [id]
+      );
+      return result.rows[0] as News || null;
+    } catch (error) {
+      console.error('Error in NewsRepository.togglePin:', error);
+      return null;
+    }
+  }
+
+  static async togglePublish(id: string): Promise<News | null> {
+    try {
+      const result = await query(
+        'UPDATE news SET is_published = NOT is_published, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
+        [id]
+      );
+      return result.rows[0] as News || null;
+    } catch (error) {
+      console.error('Error in NewsRepository.togglePublish:', error);
+      return null;
+    }
+  }
+}
+
+export class SemesterRepository {
+  static async findAll(): Promise<Semester[]> {
+    try {
+      const result = await query('SELECT * FROM semesters ORDER BY start_date DESC');
+      return result.rows as Semester[];
+    } catch (error) {
+      console.error('Error in SemesterRepository.findAll:', error);
+      return [];
+    }
+  }
+
+  static async findAllWithYearNames(): Promise<(Semester & { academic_year_name: string })[]> {
+    try {
+      const result = await query(`
+        SELECT s.*, ay.name as academic_year_name
+        FROM semesters s
+        LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+        ORDER BY s.start_date ASC
+      `);
+      return result.rows as (Semester & { academic_year_name: string })[];
+    } catch (error) {
+      console.error('Error in SemesterRepository.findAllWithYearNames:', error);
+      return [];
+    }
+  }
+
+  static async findById(id: string): Promise<Semester | null> {
+    try {
+      const result = await query('SELECT * FROM semesters WHERE id = $1', [id]);
+      return result.rows[0] as Semester || null;
+    } catch (error) {
+      console.error('Error in SemesterRepository.findById:', error);
+      return null;
+    }
+  }
+
+  static async findByAcademicYearId(academicYearId: string): Promise<Semester[]> {
+    try {
+      const result = await query(
+        'SELECT * FROM semesters WHERE academic_year_id = $1 ORDER BY start_date ASC',
+        [academicYearId]
+      );
+      return result.rows as Semester[];
+    } catch (error) {
+      console.error('Error in SemesterRepository.findByAcademicYearId:', error);
+      return [];
+    }
+  }
+
+  static async create(data: { name: string; start_date: string; end_date: string; academic_year_id: string }): Promise<Semester | null> {
+    try {
+      const result = await query(
+        'INSERT INTO semesters (name, start_date, end_date, academic_year_id) VALUES ($1, $2, $3, $4) RETURNING *',
+        [data.name, data.start_date, data.end_date, data.academic_year_id]
+      );
+      return result.rows[0] as Semester;
+    } catch (error) {
+      console.error('Error in SemesterRepository.create:', error);
+      return null;
+    }
+  }
+
+  static async update(id: string, data: Partial<{ name: string; start_date: string; end_date: string }>): Promise<Semester | null> {
+    try {
+      const updates: string[] = [];
+      const values: any[] = [];
+      let paramIndex = 1;
+
+      if (data.name !== undefined) {
+        updates.push(`name = $${paramIndex++}`);
+        values.push(data.name);
+      }
+      if (data.start_date !== undefined) {
+        updates.push(`start_date = $${paramIndex++}`);
+        values.push(data.start_date);
+      }
+      if (data.end_date !== undefined) {
+        updates.push(`end_date = $${paramIndex++}`);
+        values.push(data.end_date);
+      }
+
+      if (updates.length === 0) return null;
+
+      values.push(id);
+
+      const result = await query(
+        `UPDATE semesters SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+        values
+      );
+      return result.rows[0] as Semester || null;
+    } catch (error) {
+      console.error('Error in SemesterRepository.update:', error);
+      return null;
+    }
+  }
+
+  static async delete(id: string): Promise<boolean> {
+    try {
+      const result = await query('DELETE FROM semesters WHERE id = $1 RETURNING *', [id]);
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error in SemesterRepository.delete:', error);
+      return false;
+    }
+  }
+
+  static async setActive(id: string): Promise<Semester | null> {
+    try {
+      // Deactivate all semesters first
+      await query('UPDATE semesters SET is_active = false');
+      
+      // Activate the selected semester
+      const result = await query(
+        'UPDATE semesters SET is_active = true WHERE id = $1 RETURNING *',
+        [id]
+      );
+      return result.rows[0] as Semester || null;
+    } catch (error) {
+      console.error('Error in SemesterRepository.setActive:', error);
+      return null;
+    }
+  }
+}
+
+export class AcademicYearRepository {
+  static async findAll(): Promise<AcademicYear[]> {
+    try {
+      const result = await query('SELECT * FROM academic_years ORDER BY start_date DESC');
+      return result.rows as AcademicYear[];
+    } catch (error) {
+      console.error('Error in AcademicYearRepository.findAll:', error);
+      return [];
+    }
+  }
+
+  static async findById(id: string): Promise<AcademicYear | null> {
+    try {
+      const result = await query('SELECT * FROM academic_years WHERE id = $1', [id]);
+      return result.rows[0] as AcademicYear || null;
+    } catch (error) {
+      console.error('Error in AcademicYearRepository.findById:', error);
+      return null;
+    }
+  }
+
+  static async create(data: { name: string; start_date: string; end_date: string }): Promise<AcademicYear | null> {
+    try {
+      const result = await query(
+        'INSERT INTO academic_years (name, start_date, end_date) VALUES ($1, $2, $3) RETURNING *',
+        [data.name, data.start_date, data.end_date]
+      );
+      return result.rows[0] as AcademicYear;
+    } catch (error) {
+      console.error('Error in AcademicYearRepository.create:', error);
+      return null;
+    }
+  }
+
+  static async update(id: string, data: Partial<{ name: string; start_date: string; end_date: string }>): Promise<AcademicYear | null> {
+    try {
+      const updates: string[] = [];
+      const values: any[] = [];
+      let paramIndex = 1;
+
+      if (data.name !== undefined) {
+        updates.push(`name = $${paramIndex++}`);
+        values.push(data.name);
+      }
+      if (data.start_date !== undefined) {
+        updates.push(`start_date = $${paramIndex++}`);
+        values.push(data.start_date);
+      }
+      if (data.end_date !== undefined) {
+        updates.push(`end_date = $${paramIndex++}`);
+        values.push(data.end_date);
+      }
+
+      if (updates.length === 0) return null;
+
+      updates.push(`updated_at = CURRENT_TIMESTAMP`);
+      values.push(id);
+
+      const result = await query(
+        `UPDATE academic_years SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+        values
+      );
+      return result.rows[0] as AcademicYear || null;
+    } catch (error) {
+      console.error('Error in AcademicYearRepository.update:', error);
+      return null;
+    }
+  }
+
+  static async delete(id: string): Promise<boolean> {
+    try {
+      const result = await query('DELETE FROM academic_years WHERE id = $1 RETURNING *', [id]);
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error in AcademicYearRepository.delete:', error);
+      return false;
     }
   }
 }

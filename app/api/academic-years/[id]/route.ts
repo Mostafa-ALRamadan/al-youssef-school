@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { AcademicYearService } from '@/services';
 
 // DELETE /api/academic-years/[id] - Delete an academic year
 export async function DELETE(
@@ -9,13 +9,9 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    // Delete related semesters first (cascade will handle this, but let's be explicit)
-    await query('DELETE FROM semesters WHERE academic_year_id = $1', [id]);
+    const deleted = await AcademicYearService.deleteAcademicYearWithSemesters(id);
 
-    // Delete the academic year
-    const result = await query('DELETE FROM academic_years WHERE id = $1 RETURNING *', [id]);
-
-    if (result.rowCount === 0) {
+    if (!deleted) {
       return NextResponse.json(
         { error: 'السنة الدراسية غير موجودة' },
         { status: 404 }
@@ -52,12 +48,9 @@ export async function PUT(
       );
     }
 
-    const result = await query(
-      'UPDATE academic_years SET name = $1, start_date = $2, end_date = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
-      [name, start_date, end_date, id]
-    );
+    const academicYear = await AcademicYearService.updateAcademicYear(id, { name, start_date, end_date });
 
-    if (result.rowCount === 0) {
+    if (!academicYear) {
       return NextResponse.json(
         { error: 'السنة الدراسية غير موجودة' },
         { status: 404 }
@@ -65,7 +58,7 @@ export async function PUT(
     }
 
     return NextResponse.json({ 
-      academicYear: result.rows[0],
+      academicYear,
       message: 'تم تحديث السنة الدراسية بنجاح'
     });
   } catch (error: any) {

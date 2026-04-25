@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { AcademicYearService } from '@/services';
 
 // POST /api/academic-years/set-active - Set an academic year as active
 export async function POST(request: Request) {
@@ -14,24 +14,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Deactivate all academic years
-    await query('UPDATE academic_years SET is_active = false');
+    const success = await AcademicYearService.setActiveAcademicYear(yearId);
 
-    // Deactivate all semesters
-    await query('UPDATE semesters SET is_active = false');
-
-    // Activate the selected year
-    await query(
-      'UPDATE academic_years SET is_active = true WHERE id = $1',
-      [yearId]
-    );
-
-    // Activate the first semester of this year (if any exists)
-    await query(
-      `UPDATE semesters SET is_active = true 
-       WHERE id = (SELECT id FROM semesters WHERE academic_year_id = $1 ORDER BY start_date LIMIT 1)`,
-      [yearId]
-    );
+    if (!success) {
+      return NextResponse.json(
+        { error: 'فشل في تفعيل السنة الدراسية' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ 
       success: true,

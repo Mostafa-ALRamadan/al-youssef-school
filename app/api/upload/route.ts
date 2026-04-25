@@ -7,6 +7,12 @@ import { existsSync } from 'fs';
 // POST /api/upload - Upload images
 export async function POST(request: NextRequest) {
   try {
+    // Check authentication
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const type = formData.get('type') as string || 'general';
@@ -49,7 +55,8 @@ export async function POST(request: NextRequest) {
       : `${type}_${timestamp}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
 
     // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', type);
+    const uploadBasePath = process.env.UPLOAD_PATH || join(process.cwd(), 'public', 'uploads');
+    const uploadsDir = join(uploadBasePath, type);
     if (!existsSync(uploadsDir)) {
       await mkdir(uploadsDir, { recursive: true });
     }
@@ -60,7 +67,7 @@ export async function POST(request: NextRequest) {
     const filepath = join(uploadsDir, filename);
     await writeFile(filepath, buffer);
 
-    // Return public URL
+    // Return public URL (relative to public/uploads)
     const url = `/uploads/${type}/${filename}`;
 
     return NextResponse.json({

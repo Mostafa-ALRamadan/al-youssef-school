@@ -71,6 +71,27 @@ export interface Subject {
   updated_at: string;
 }
 
+export interface AcademicYear {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Semester {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  academic_year_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ClassSubject {
   id: string;
   class_id: string;
@@ -155,6 +176,47 @@ export interface Payment {
   description?: string;
   created_at: string;
   updated_at: string;
+}
+
+// New School Payment System Types (نظام الأقساط)
+export type PaymentMethod = 'cash' | 'bank' | 'online';
+
+export interface StudentFee {
+  id: string;
+  student_id: string;
+  academic_year_id: string;
+  school_fee: number;
+  transport_fee: number;
+  created_at: string;
+  updated_at: string;
+  // Joined data for display
+  student_name?: string;
+  academic_year_name?: string;
+  // Calculated fields (not stored in DB)
+  total_fees?: number;
+  total_paid?: number;
+  remaining_balance?: number;
+}
+
+export interface FeePayment {
+  id: string;
+  student_fee_id: string;
+  amount: number;
+  payment_date: string;
+  payment_method: PaymentMethod;
+  notes?: string;
+  created_by?: string;
+  created_at: string;
+  // Joined data for display
+  student_name?: string;
+  created_by_name?: string;
+}
+
+export interface PaymentSummary {
+  total_fees: number;
+  total_paid: number;
+  total_remaining: number;
+  student_count: number;
 }
 
 export interface Schedule {
@@ -282,4 +344,16 @@ export interface StudentEvaluation {
   student_name?: string;
   teacher_name?: string;
   class_name?: string;
+}
+
+export interface News {
+  id: string;
+  title: string;
+  summary?: string;
+  content: string;
+  image_url?: string;
+  is_published: boolean;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
 }

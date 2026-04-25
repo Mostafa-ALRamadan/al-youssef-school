@@ -130,10 +130,8 @@ export default function AdminEvaluationsPage() {
       if (selectedTeacher && selectedTeacher !== '__all__') params.append('teacher_id', selectedTeacher);
       if (selectedSemester) params.append('semester_id', selectedSemester);
 
-      console.log('Fetching evaluations with semester:', selectedSemester);
       const response = await fetch(`/api/student-evaluations?${params.toString()}`);
       const data = await response.json();
-      console.log('Evaluations response:', data);
 
       setEvaluations(data.evaluations || []);
     } catch (error) {

@@ -215,23 +215,42 @@ CREATE TABLE IF NOT EXISTS announcements (
 );
 
 -- ============================================================================
--- 15. PAYMENTS TABLE
+-- 15. STUDENT FEES TABLE (نظام الأقساط)
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS payments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    student_id UUID NOT NULL REFERENCES students(id),
-    amount DECIMAL(10,2) NOT NULL,
-    payment_type VARCHAR(50) NOT NULL,
-    payment_date DATE NOT NULL,
-    status VARCHAR(20) DEFAULT 'paid' CHECK (status IN ('paid', 'pending', 'overdue')),
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS student_fees (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    academic_year_id UUID REFERENCES academic_years(id),
+    school_fee NUMERIC NOT NULL DEFAULT 0,
+    transport_fee NUMERIC NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+    CONSTRAINT unique_student_year_fee UNIQUE (student_id, academic_year_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_payments_student_id ON payments(student_id);
+CREATE INDEX IF NOT EXISTS idx_student_fees_student_id ON student_fees(student_id);
+CREATE INDEX IF NOT EXISTS idx_student_fees_academic_year_id ON student_fees(academic_year_id);
 
 -- ============================================================================
--- 16. COMPLAINTS TABLE
+-- 16. FEE PAYMENTS TABLE (تفاصيل الدفعات)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS fee_payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_fee_id UUID NOT NULL REFERENCES student_fees(id) ON DELETE CASCADE,
+    amount NUMERIC NOT NULL CHECK (amount > 0),
+    payment_date DATE DEFAULT CURRENT_DATE,
+    payment_method TEXT DEFAULT 'cash',
+    notes TEXT,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+    CONSTRAINT payment_method_check CHECK (payment_method IN ('cash', 'bank', 'online'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_fee_payments_student_fee_id ON fee_payments(student_fee_id);
+CREATE INDEX IF NOT EXISTS idx_fee_payments_payment_date ON fee_payments(payment_date);
+
+-- ============================================================================
+-- 17. COMPLAINTS TABLE
 -- ============================================================================
 CREATE TABLE complaints (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -249,7 +268,7 @@ CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_parent_id ON complaints(parent_id);
 
 -- ============================================================================
--- 17. STUDENT EVALUATIONS TABLE
+-- 18. STUDENT EVALUATIONS TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS student_evaluations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -268,7 +287,7 @@ CREATE INDEX IF NOT EXISTS idx_evaluations_teacher_id ON student_evaluations(tea
 CREATE INDEX IF NOT EXISTS idx_evaluations_semester_id ON student_evaluations(semester_id);
 
 -- ============================================================================
--- 18. CLASS TOP STUDENTS TABLE (Stars of the Year)
+-- 19. CLASS TOP STUDENTS TABLE (Stars of the Year)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS class_top_students (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -287,7 +306,7 @@ CREATE INDEX IF NOT EXISTS idx_class_top_students_academic_year_id ON class_top_
 CREATE INDEX IF NOT EXISTS idx_class_top_students_student_id ON class_top_students(student_id);
 
 -- ============================================================================
--- 19. TEACHER ASSIGNMENTS TABLE
+-- 20. TEACHER ASSIGNMENTS TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS teacher_assignments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -302,7 +321,7 @@ CREATE INDEX IF NOT EXISTS idx_teacher_assignments_teacher_id ON teacher_assignm
 CREATE INDEX IF NOT EXISTS idx_teacher_assignments_class_id ON teacher_assignments(class_id);
 
 -- ============================================================================
--- 20. WEEKLY SCHEDULE TABLE
+-- 21. WEEKLY SCHEDULE TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS weekly_schedule (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -318,6 +337,47 @@ CREATE TABLE IF NOT EXISTS weekly_schedule (
 CREATE INDEX IF NOT EXISTS idx_weekly_schedule_teacher_id ON weekly_schedule(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_weekly_schedule_class_id ON weekly_schedule(class_id);
 
+-- ============================================================================
+-- 22. NEWS TABLE (School News)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS news (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    summary TEXT,
+    content TEXT NOT NULL,
+    image_url TEXT,
+    is_published BOOLEAN DEFAULT true,
+    is_pinned BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_news_is_published ON news(is_published);
+CREATE INDEX IF NOT EXISTS idx_news_is_pinned ON news(is_pinned);
+CREATE INDEX IF NOT EXISTS idx_news_created_at ON news(created_at);
+
+CREATE TRIGGER update_news_updated_at BEFORE UPDATE ON news FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
+-- ============================================================================
+-- 23. TEACHER POSTS TABLE (منشورات المعلمين)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS teacher_posts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    teacher_id UUID NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+    semester_id UUID NOT NULL REFERENCES semesters(id),
+    title TEXT,
+    content TEXT NOT NULL,
+    image_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_teacher_posts_teacher_id ON teacher_posts(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_posts_class_id ON teacher_posts(class_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_posts_semester_id ON teacher_posts(semester_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_posts_created_at ON teacher_posts(created_at DESC);
 
 -- ============================================================================
 -- TRIGGERS FOR UPDATED_AT

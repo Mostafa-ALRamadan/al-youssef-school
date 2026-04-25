@@ -186,6 +186,20 @@ export async function PUT(request: NextRequest) {
     const currentStudent = currentStudentResult.rows[0];
     const oldParentId = currentStudent.parent_id;
 
+    // Delete old image if new image is being uploaded
+    if (image_url !== undefined && image_url !== currentStudent.image_url && currentStudent.image_url) {
+      try {
+        const uploadBasePath = process.env.UPLOAD_PATH || join(process.cwd(), 'public', 'uploads');
+        const oldImagePath = join(uploadBasePath, currentStudent.image_url.replace('/uploads/', ''));
+        if (existsSync(oldImagePath)) {
+          await unlink(oldImagePath);
+        }
+      } catch (fileError) {
+        console.error('Error deleting old student image:', fileError);
+        // Continue even if file deletion fails
+      }
+    }
+
     await query('BEGIN');
 
     try {
@@ -306,7 +320,8 @@ export async function PUT(request: NextRequest) {
       // Rename image file if login_name changed and image exists
       if ((name !== undefined || parent_name !== undefined) && currentStudent.image_url) {
         try {
-          const oldImagePath = join(process.cwd(), 'public', currentStudent.image_url);
+          const uploadBasePath = process.env.UPLOAD_PATH || join(process.cwd(), 'public', 'uploads');
+          const oldImagePath = join(uploadBasePath, currentStudent.image_url.replace('/uploads/', ''));
           if (existsSync(oldImagePath)) {
             const pathParts = currentStudent.image_url.split('/');
             const oldFilename = pathParts[pathParts.length - 1];
@@ -320,7 +335,7 @@ export async function PUT(request: NextRequest) {
             const timestamp = Date.now();
             const newFilename = `صورة_${genderLabel}_${finalLoginName}_${timestamp}.${extension}`;
             
-            const newImagePath = join(process.cwd(), 'public', 'uploads', 'student-image', newFilename);
+            const newImagePath = join(uploadBasePath, 'student-image', newFilename);
             
             await rename(oldImagePath, newImagePath);
             
@@ -396,7 +411,8 @@ export async function DELETE(request: NextRequest) {
     // Delete student image file if exists
     if (student.image_url) {
       try {
-        const imagePath = join(process.cwd(), 'public', student.image_url);
+        const uploadBasePath = process.env.UPLOAD_PATH || join(process.cwd(), 'public', 'uploads');
+        const imagePath = join(uploadBasePath, student.image_url.replace('/uploads/', ''));
         if (existsSync(imagePath)) {
           await unlink(imagePath);
         }

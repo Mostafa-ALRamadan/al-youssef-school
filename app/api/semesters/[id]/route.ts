@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { SemesterService } from '@/services';
 
 // DELETE /api/semesters/[id] - Delete a semester
 export async function DELETE(
@@ -9,9 +9,9 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const result = await query('DELETE FROM semesters WHERE id = $1 RETURNING *', [id]);
+    const deleted = await SemesterService.deleteSemester(id);
 
-    if (result.rowCount === 0) {
+    if (!deleted) {
       return NextResponse.json(
         { error: 'الفصل الدراسي غير موجود' },
         { status: 404 }
@@ -48,12 +48,9 @@ export async function PUT(
       );
     }
 
-    const result = await query(
-      'UPDATE semesters SET name = $1, start_date = $2, end_date = $3 WHERE id = $4 RETURNING *',
-      [name, start_date, end_date, id]
-    );
+    const semester = await SemesterService.updateSemester(id, { name, start_date, end_date });
 
-    if (result.rowCount === 0) {
+    if (!semester) {
       return NextResponse.json(
         { error: 'الفصل الدراسي غير موجود' },
         { status: 404 }
@@ -61,7 +58,7 @@ export async function PUT(
     }
 
     return NextResponse.json({ 
-      semester: result.rows[0],
+      semester,
       message: 'تم تحديث الفصل الدراسي بنجاح'
     });
   } catch (error: any) {

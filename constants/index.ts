@@ -22,9 +22,9 @@ export const SIDEBAR_ITEMS = [
   { id: 'subjects', label: 'المواد', icon: 'BookOpen', href: '/admin/subjects' },
   { id: 'academic-years', label: 'السنوات الدراسية', icon: 'CalendarDays', href: '/admin/academic-years' },
   { id: 'announcements', label: 'الإعلانات', icon: 'Megaphone', href: '/admin/announcements' },
+  { id: 'news', label: 'أخبار المدرسة', icon: 'Newspaper', href: '/admin/news' },
   { id: 'attendance', label: 'التفقد اليومي', icon: 'ClipboardCheck', href: '/admin/attendance' },
   { id: 'grades', label: 'العلامات', icon: 'Award', href: '/admin/grades' },
-  { id: 'fees', label: 'الأقساط', icon: 'CreditCard', href: '/admin/fees' },
   { id: 'schedule', label: 'البرنامج الأسبوعي', icon: 'Calendar', href: '/admin/schedule' },
   { id: 'complaints', label: 'صندوق الشكاوي', icon: 'MessageSquare', href: '/admin/complaints', requiresMainAdmin: true },
   { id: 'evaluations', label: 'تقييم الطلاب', icon: 'Star', href: '/admin/evaluations' },
@@ -34,6 +34,7 @@ export const SIDEBAR_ITEMS = [
 
 export const ADMIN_SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'لوحة التحكم', icon: 'LayoutDashboard', href: '/admin/dashboard' },
+  { id: 'payments', label: 'الأقساط', icon: 'Wallet', href: '/admin/payments' },
   ...SIDEBAR_ITEMS,
 ] as const;
 
@@ -42,6 +43,7 @@ export const TEACHER_SIDEBAR_ITEMS = [
   { id: 'students', label: 'طلابي', icon: 'Users', href: '/teacher/students' },
   { id: 'attendance', label: 'التفقد اليومي', icon: 'ClipboardCheck', href: '/teacher/attendance' },
   { id: 'grades', label: 'العلامات', icon: 'Award', href: '/teacher/grades' },
+  { id: 'posts', label: 'منشوراتي', icon: 'Newspaper', href: '/teacher/posts' },
   { id: 'schedule', label: 'جدولي', icon: 'Calendar', href: '/teacher/schedule' },
   { id: 'announcements', label: 'الإعلانات', icon: 'Megaphone', href: '/teacher/announcements' },
   { id: 'evaluations', label: 'تقييم الطلاب', icon: 'Star', href: '/teacher/evaluations' },

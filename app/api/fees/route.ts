@@ -1,28 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PaymentService } from '@/services';
-import { ERROR_MESSAGES } from '@/constants';
+import { StudentFeeService } from '@/services';
 
 /**
  * GET /api/fees
- * Returns payment records
+ * Returns all student fees with payment summaries
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
+    const fees = await StudentFeeService.getAllFees();
+    return NextResponse.json({ fees });
+  } catch (error) {
+    console.error('Get fees error:', error);
+    return NextResponse.json(
+      { error: 'حدث خطأ في جلب بيانات الأقساط' },
+      { status: 500 }
+    );
+  }
+}
 
-    let payments;
-    if (status === 'pending') {
-      payments = await PaymentService.getPendingPayments();
-    } else {
-      payments = await PaymentService.getAllPayments();
+/**
+ * POST /api/fees
+ * Creates a new student fee record
+ * Body: { student_id, academic_year_id, school_fee, transport_fee }
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { student_id, academic_year_id, school_fee, transport_fee } = body;
+
+    if (!student_id || !academic_year_id) {
+      return NextResponse.json(
+        { error: 'معرف الطالب والسنة الدراسية مطلوبان' },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ payments });
+    const fee = await StudentFeeService.createStudentFee({
+      student_id,
+      academic_year_id,
+      school_fee: school_fee || 0,
+      transport_fee: transport_fee || 0,
+    });
+
+    if (!fee) {
+      return NextResponse.json(
+        { error: 'فشل في إنشاء سجل الأقساط' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ fee });
   } catch (error) {
-    console.error('Get payments error:', error);
+    console.error('Create fee error:', error);
     return NextResponse.json(
-      { error: ERROR_MESSAGES.GENERAL.UNKNOWN_ERROR },
+      { error: 'حدث خطأ في إنشاء سجل الأقساط' },
       { status: 500 }
     );
   }

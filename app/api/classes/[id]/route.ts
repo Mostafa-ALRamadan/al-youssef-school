@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { SubjectService } from '@/services';
+import { ClassService } from '@/services';
 
-// PUT /api/subjects/[id] - Update a subject
+// PUT /api/classes/[id] - Update a class
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -13,26 +13,26 @@ export async function PUT(
 
     if (!name) {
       return NextResponse.json(
-        { error: 'اسم المادة مطلوب' },
+        { error: 'اسم الصف مطلوب' },
         { status: 400 }
       );
     }
 
-    const subject = await SubjectService.updateSubject(id, { name });
+    const updatedClass = await ClassService.updateClass(id, { name });
 
-    if (!subject) {
+    if (!updatedClass) {
       return NextResponse.json(
-        { error: 'المادة غير موجودة' },
+        { error: 'الصف غير موجود' },
         { status: 404 }
       );
     }
 
     return NextResponse.json({ 
-      subject,
-      message: 'تم تحديث المادة بنجاح'
+      class: updatedClass,
+      message: 'تم تحديث الصف بنجاح'
     });
   } catch (error: any) {
-    console.error('Update subject error:', error);
+    console.error('Update class error:', error);
     return NextResponse.json(
       { error: error.message },
       { status: 500 }
@@ -40,7 +40,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/subjects/[id] - Delete a subject
+// DELETE /api/classes/[id] - Delete a class
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -48,21 +48,21 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const deleted = await SubjectService.deleteSubject(id);
+    const deleted = await ClassService.deleteClass(id);
 
     if (!deleted) {
       return NextResponse.json(
-        { error: 'المادة غير موجودة' },
+        { error: 'الصف غير موجود' },
         { status: 404 }
       );
     }
 
     return NextResponse.json({ 
       success: true,
-      message: 'تم حذف المادة بنجاح'
+      message: 'تم حذف الصف بنجاح'
     });
   } catch (error: any) {
-    console.error('Delete subject error:', error);
+    console.error('Delete class error:', error);
     return NextResponse.json(
       { error: error.message },
       { status: 500 }

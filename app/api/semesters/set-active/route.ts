@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { SemesterService } from '@/services';
 
 // POST /api/semesters/set-active - Set a semester as active (and its year)
 export async function POST(request: Request) {
@@ -14,38 +14,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get the semester's academic year ID
-    const semesterResult = await query(
-      'SELECT academic_year_id FROM semesters WHERE id = $1',
-      [semesterId]
-    );
+    const success = await SemesterService.setActiveSemesterWithYear(semesterId);
 
-    if (semesterResult.rows.length === 0) {
+    if (!success) {
       return NextResponse.json(
         { error: 'الفصل الدراسي غير موجود' },
         { status: 404 }
       );
     }
-
-    const academicYearId = semesterResult.rows[0].academic_year_id;
-
-    // Deactivate all academic years
-    await query('UPDATE academic_years SET is_active = false');
-
-    // Deactivate all semesters
-    await query('UPDATE semesters SET is_active = false');
-
-    // Activate the selected academic year
-    await query(
-      'UPDATE academic_years SET is_active = true WHERE id = $1',
-      [academicYearId]
-    );
-
-    // Activate the selected semester
-    await query(
-      'UPDATE semesters SET is_active = true WHERE id = $1',
-      [semesterId]
-    );
 
     return NextResponse.json({ 
       success: true,

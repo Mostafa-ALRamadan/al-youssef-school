@@ -196,7 +196,6 @@ export default function StudentsPage() {
     let formattedDate = '';
     if (student.date_of_birth) {
       const dateValue: string | Date = student.date_of_birth as any;
-      console.log('date_of_birth raw:', dateValue, 'type:', typeof dateValue);
       
       if (typeof dateValue === 'object' && dateValue !== null && 'getTime' in dateValue) {
         // Date object from API - format as YYYY-MM-DD using local date components
@@ -205,7 +204,6 @@ export default function StudentsPage() {
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
         formattedDate = `${year}-${month}-${day}`;
-        console.log('Date object formatted:', formattedDate);
       } else if (typeof dateValue === 'string') {
         if (dateValue.includes('T')) {
           // ISO timestamp string - convert to Date then get local date components
@@ -218,7 +216,6 @@ export default function StudentsPage() {
           // Already YYYY-MM-DD string format
           formattedDate = dateValue;
         }
-        console.log('String formatted:', formattedDate);
       }
     }
     

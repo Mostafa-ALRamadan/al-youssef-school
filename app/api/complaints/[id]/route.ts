@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { ComplaintService } from '@/services';
 import { getCurrentUser } from '@/lib/auth';
 
 // PUT /api/complaints/[id] - Update complaint status or add reply
@@ -22,15 +22,12 @@ export async function PUT(
 
     // Handle reply update
     if (body.reply !== undefined) {
-      const result = await query(
-        `UPDATE complaints 
-         SET reply = $1, replied_by = $2, replied_at = CURRENT_TIMESTAMP, status = 'resolved' 
-         WHERE id = $3 
-         RETURNING *`,
-        [body.reply, currentUser.userId, id]
+      const complaint = await ComplaintService.addReply(
+        id,
+        body.reply,
+        currentUser.userId
       );
 
-      const complaint = result.rows[0];
       if (!complaint) {
         return NextResponse.json(
           { error: 'Complaint not found' },
@@ -52,36 +49,14 @@ export async function PUT(
       );
     }
 
-    // Map Arabic status values to English DB status
-    const statusMap: Record<string, string> = {
-      'معلق': 'pending',
-      'تم المراجعة': 'in_progress',
-      'تم التنفيذ': 'resolved',
-      'مرفوض': 'closed',
-      // Also accept DB values directly
-      'pending': 'pending',
-      'in_progress': 'in_progress',
-      'resolved': 'resolved',
-      'closed': 'closed',
-    };
-
-    const dbStatus = statusMap[body.status];
-    if (!dbStatus) {
-      return NextResponse.json(
-        { error: 'Invalid status. Must be: معلق, تم المراجعة, تم التنفيذ, or مرفوض' },
-        { status: 400 }
-      );
-    }
-
-    const result = await query(
-      'UPDATE complaints SET status = $1 WHERE id = $2 RETURNING *',
-      [dbStatus, id]
+    const complaint = await ComplaintService.updateComplaintStatus(
+      id,
+      body.status
     );
 
-    const complaint = result.rows[0];
     if (!complaint) {
       return NextResponse.json(
-        { error: 'Complaint not found' },
+        { error: 'Complaint not found or invalid status' },
         { status: 404 }
       );
     }
@@ -107,7 +82,14 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    await query('DELETE FROM complaints WHERE id = $1', [id]);
+    const deleted = await ComplaintService.deleteComplaint(id);
+
+    if (!deleted) {
+      return NextResponse.json(
+        { error: 'Complaint not found' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({
       message: 'تم حذف الشكوى بنجاح',

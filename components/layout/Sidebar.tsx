@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -20,16 +20,16 @@ import {
   Megaphone,
   ClipboardCheck,
   Award,
-  CreditCard,
   Calendar,
   CalendarDays,
   MessageSquare,
   Star,
   Trophy,
-  Settings,
   Menu,
   LogOut,
   ChevronLeft,
+  Newspaper,
+  Wallet,
 } from 'lucide-react';
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -42,13 +42,13 @@ const iconMap: Record<string, React.ReactNode> = {
   Megaphone: <Megaphone className="h-5 w-5" />,
   ClipboardCheck: <ClipboardCheck className="h-5 w-5" />,
   Award: <Award className="h-5 w-5" />,
-  CreditCard: <CreditCard className="h-5 w-5" />,
   Calendar: <Calendar className="h-5 w-5" />,
   CalendarDays: <CalendarDays className="h-5 w-5" />,
   MessageSquare: <MessageSquare className="h-5 w-5" />,
   Star: <Star className="h-5 w-5" />,
   Trophy: <Trophy className="h-5 w-5" />,
-  Settings: <Settings className="h-5 w-5" />,
+  Newspaper: <Newspaper className="h-5 w-5" />,
+  Wallet: <Wallet className="h-5 w-5" />,
 };
 
 interface SidebarItem {
@@ -71,6 +71,22 @@ export function Sidebar({ items, userRole, isMainAdmin }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { userInfo, clearUser } = useUser();
+  const navRef = useRef<HTMLElement>(null);
+
+  // Restore scroll position on mount
+  useLayoutEffect(() => {
+    const savedScroll = sessionStorage.getItem('sidebar_scroll');
+    if (navRef.current && savedScroll) {
+      navRef.current.scrollTop = parseInt(savedScroll, 10);
+    }
+  }, []);
+
+  // Save scroll position on scroll
+  const handleScroll = () => {
+    if (navRef.current) {
+      sessionStorage.setItem('sidebar_scroll', String(navRef.current.scrollTop));
+    }
+  };
 
   // Use provided isMainAdmin or get from user context
   const actualIsMainAdmin = isMainAdmin !== undefined ? isMainAdmin : userInfo?.is_main_admin;
@@ -97,8 +113,9 @@ export function Sidebar({ items, userRole, isMainAdmin }: SidebarProps) {
         });
       }
       
-      // Clear token from localStorage
+      // Clear token and scroll position
       removeToken();
+      sessionStorage.removeItem('sidebar_scroll');
       
       // Clear user state
       clearUser();
@@ -173,6 +190,8 @@ export function Sidebar({ items, userRole, isMainAdmin }: SidebarProps) {
 
         {/* Navigation */}
         <nav 
+          ref={navRef}
+          onScroll={handleScroll}
           className="flex-1 overflow-y-auto py-4 px-2 space-y-1"
           style={{
             scrollbarWidth: 'thin',

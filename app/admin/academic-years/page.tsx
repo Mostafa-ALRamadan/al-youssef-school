@@ -296,10 +296,24 @@ export default function AcademicYearsPage() {
   const openEditYear = (year: AcademicYear) => {
     setEditingYear(year);
     
+    // Format dates as YYYY-MM-DD for HTML date input (Western numerals)
+    const formatDateForInput = (dateStr: string | null): string => {
+      if (!dateStr) return '';
+      // If already in YYYY-MM-DD format, return as is
+      if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dateStr;
+      // Handle Date object or ISO string
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
     setYearForm({
       name: year.name,
-      start_date: year.start_date || '',
-      end_date: year.end_date || '',
+      start_date: formatDateForInput(year.start_date),
+      end_date: formatDateForInput(year.end_date),
     });
     setEditYearDialogOpen(true);
   };
@@ -307,10 +321,22 @@ export default function AcademicYearsPage() {
   const openEditSemester = (semester: Semester) => {
     setEditingSemester(semester);
     
+    // Format dates as YYYY-MM-DD for HTML date input
+    const formatDateForInput = (dateStr: string | null): string => {
+      if (!dateStr) return '';
+      if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dateStr;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
     setSemesterForm({
       name: semester.name,
-      start_date: semester.start_date || '',
-      end_date: semester.end_date || '',
+      start_date: formatDateForInput(semester.start_date),
+      end_date: formatDateForInput(semester.end_date),
     });
     setEditSemesterDialogOpen(true);
   };

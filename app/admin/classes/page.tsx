@@ -91,10 +91,10 @@ export default function ClassesPage() {
     if (!selectedClass) return;
     
     try {
-      const response = await fetch('/api/classes', {
+      const response = await fetch(`/api/classes/${selectedClass.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selectedClass.id, ...formData }),
+        body: JSON.stringify(formData),
       });
       
       if (response.ok) {
@@ -112,7 +112,7 @@ export default function ClassesPage() {
     if (!selectedClass) return;
     
     try {
-      const response = await fetch(`/api/classes?id=${selectedClass.id}`, {
+      const response = await fetch(`/api/classes/${selectedClass.id}`, {
         method: 'DELETE',
       });
       

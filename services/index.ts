@@ -1,15 +1,18 @@
 import type { Parent, TeacherAssignment, WeeklySchedule, TimeSlot, AttendanceSession, AttendanceRecord } from '@/types';
-import type { User, DashboardStats, Grade, Announcement, Complaint } from '@/types';
+import type { User, DashboardStats, Grade, Announcement, Complaint, News, StudentFee, FeePayment, PaymentMethod, PaymentSummary } from '@/types';
 import {
   StudentRepository,
   ParentRepository,
   TeacherRepository,
   ClassRepository,
   SubjectRepository,
+  AcademicYearRepository,
+  SemesterRepository,
   AnnouncementRepository,
   AttendanceRepository,
   GradeRepository,
-  PaymentRepository,
+  StudentFeeRepository,
+  FeePaymentRepository,
   ScheduleRepository,
   ComplaintRepository,
   DashboardRepository,
@@ -17,6 +20,7 @@ import {
   WeeklyScheduleRepository,
   TimeSlotRepository,
   ExamRepository,
+  NewsRepository,
 } from '@/repositories';
 import { query } from '@/lib/db';
 import bcrypt from 'bcrypt';
@@ -315,6 +319,132 @@ export class SubjectService {
   }
 }
 
+export class AcademicYearService {
+  static async getAllAcademicYears() {
+    return await AcademicYearRepository.findAll();
+  }
+
+  static async getAcademicYearById(id: string) {
+    return await AcademicYearRepository.findById(id);
+  }
+
+  static async createAcademicYear(data: { name: string; start_date: string; end_date: string }) {
+    return await AcademicYearRepository.create(data);
+  }
+
+  static async updateAcademicYear(id: string, data: Partial<{ name: string; start_date: string; end_date: string }>) {
+    return await AcademicYearRepository.update(id, data);
+  }
+
+  static async deleteAcademicYear(id: string) {
+    return await AcademicYearRepository.delete(id);
+  }
+
+  static async deleteAcademicYearWithSemesters(id: string): Promise<boolean> {
+    try {
+      // Delete related semesters first (cascade will handle this, but let's be explicit)
+      await query('DELETE FROM semesters WHERE academic_year_id = $1', [id]);
+
+      // Delete the academic year
+      const result = await query('DELETE FROM academic_years WHERE id = $1 RETURNING *', [id]);
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error in deleteAcademicYearWithSemesters:', error);
+      return false;
+    }
+  }
+
+  static async setActiveAcademicYear(yearId: string): Promise<boolean> {
+    try {
+      // Deactivate all academic years
+      await query('UPDATE academic_years SET is_active = false');
+
+      // Deactivate all semesters
+      await query('UPDATE semesters SET is_active = false');
+
+      // Activate the selected year
+      await query(
+        'UPDATE academic_years SET is_active = true WHERE id = $1',
+        [yearId]
+      );
+
+      // Activate the first semester of this year (if any exists)
+      await query(
+        `UPDATE semesters SET is_active = true 
+         WHERE id = (SELECT id FROM semesters WHERE academic_year_id = $1 ORDER BY start_date LIMIT 1)`,
+        [yearId]
+      );
+
+      return true;
+    } catch (error) {
+      console.error('Error in setActiveAcademicYear:', error);
+      return false;
+    }
+  }
+}
+
+export class SemesterService {
+  static async getAllSemesters() {
+    return await SemesterRepository.findAll();
+  }
+
+  static async getAllSemestersWithYearNames() {
+    return await SemesterRepository.findAllWithYearNames();
+  }
+
+  static async getSemesterById(id: string) {
+    return await SemesterRepository.findById(id);
+  }
+
+  static async getSemestersByAcademicYearId(academicYearId: string) {
+    return await SemesterRepository.findByAcademicYearId(academicYearId);
+  }
+
+  static async createSemester(data: { name: string; start_date: string; end_date: string; academic_year_id: string }) {
+    return await SemesterRepository.create(data);
+  }
+
+  static async updateSemester(id: string, data: Partial<{ name: string; start_date: string; end_date: string }>) {
+    return await SemesterRepository.update(id, data);
+  }
+
+  static async deleteSemester(id: string) {
+    return await SemesterRepository.delete(id);
+  }
+
+  static async setActiveSemester(id: string) {
+    return await SemesterRepository.setActive(id);
+  }
+
+  static async setActiveSemesterWithYear(semesterId: string): Promise<boolean> {
+    try {
+      const semester = await SemesterRepository.findById(semesterId);
+      if (!semester) return false;
+
+      // Deactivate all academic years and semesters
+      await query('UPDATE academic_years SET is_active = false');
+      await query('UPDATE semesters SET is_active = false');
+
+      // Activate the semester's academic year
+      await query(
+        'UPDATE academic_years SET is_active = true WHERE id = $1',
+        [semester.academic_year_id]
+      );
+
+      // Activate the semester
+      await query(
+        'UPDATE semesters SET is_active = true WHERE id = $1',
+        [semesterId]
+      );
+
+      return true;
+    } catch (error) {
+      console.error('Error in setActiveSemesterWithYear:', error);
+      return false;
+    }
+  }
+}
+
 export class AttendanceService {
   // Get or create attendance session for a schedule on a specific date
   static async getOrCreateSession(scheduleId: string, date: string) {
@@ -397,17 +527,130 @@ export class AttendanceService {
   }
 }
 
-export class PaymentService {
-  static async getAllPayments() {
-    return await PaymentRepository.findAll();
+export class StudentFeeService {
+  static async getAllFees(): Promise<StudentFee[]> {
+    const fees = await StudentFeeRepository.findAll();
+    // Calculate payment summaries for each fee
+    return Promise.all(fees.map(async (fee) => this.calculatePaymentSummary(fee)));
   }
 
-  static async getPendingPayments() {
-    return await PaymentRepository.findPending();
+  static async getFeeById(id: string): Promise<StudentFee | null> {
+    const fee = await StudentFeeRepository.findById(id);
+    if (!fee) return null;
+    return this.calculatePaymentSummary(fee);
   }
 
-  static async getPendingCount() {
-    return await PaymentRepository.countPending();
+  static async getFeesByStudentId(studentId: string): Promise<StudentFee[]> {
+    const fees = await StudentFeeRepository.findByStudentId(studentId);
+    return Promise.all(fees.map(async (fee) => this.calculatePaymentSummary(fee)));
+  }
+
+  static async getOrCreateStudentFee(
+    studentId: string,
+    academicYearId: string
+  ): Promise<StudentFee | null> {
+    let fee = await StudentFeeRepository.findByStudentAndYear(studentId, academicYearId);
+    if (!fee) {
+      fee = await StudentFeeRepository.create({
+        student_id: studentId,
+        academic_year_id: academicYearId,
+        school_fee: 0,
+        transport_fee: 0,
+      });
+    }
+    return fee ? this.calculatePaymentSummary(fee) : null;
+  }
+
+  static async createStudentFee(data: Omit<StudentFee, 'id' | 'created_at' | 'updated_at'>): Promise<StudentFee | null> {
+    const fee = await StudentFeeRepository.create(data);
+    return fee ? this.calculatePaymentSummary(fee) : null;
+  }
+
+  static async updateStudentFee(id: string, data: Partial<Omit<StudentFee, 'id' | 'created_at' | 'updated_at'>>): Promise<StudentFee | null> {
+    const fee = await StudentFeeRepository.update(id, data);
+    if (!fee) return null;
+    return this.calculatePaymentSummary(fee);
+  }
+
+  static async deleteStudentFee(id: string): Promise<boolean> {
+    return await StudentFeeRepository.delete(id);
+  }
+
+  static async getPaymentHistory(studentFeeId: string): Promise<FeePayment[]> {
+    return await FeePaymentRepository.findByStudentFeeId(studentFeeId);
+  }
+
+  static async addPayment(
+    studentFeeId: string,
+    amount: number,
+    paymentDate: string,
+    paymentMethod: PaymentMethod,
+    notes?: string,
+    createdBy?: string
+  ): Promise<{ success: boolean; payment?: FeePayment; error?: string }> {
+    // Get the student fee to check remaining balance
+    const fee = await StudentFeeRepository.findById(studentFeeId);
+    if (!fee) {
+      return { success: false, error: 'لم يتم العثور على بيانات الأقساط' };
+    }
+
+    // Calculate total fees and current payments
+    const totalFees = fee.school_fee + fee.transport_fee;
+    const totalPaid = await FeePaymentRepository.getTotalPaidByStudentFeeId(studentFeeId);
+    const remainingBalance = totalFees - totalPaid;
+
+    // Check if payment amount exceeds remaining balance
+    if (amount > remainingBalance) {
+      return {
+        success: false,
+        error: `المبلغ المدفوع (${amount}) يتجاوز الرصيد المتبقي (${remainingBalance})`,
+      };
+    }
+
+    // Create the payment
+    const payment = await FeePaymentRepository.create({
+      student_fee_id: studentFeeId,
+      amount,
+      payment_date: paymentDate,
+      payment_method: paymentMethod,
+      notes,
+      created_by: createdBy,
+    });
+
+    if (!payment) {
+      return { success: false, error: 'فشل في إضافة الدفعة' };
+    }
+
+    return { success: true, payment };
+  }
+
+  static async updatePayment(
+    paymentId: string,
+    data: Partial<Omit<FeePayment, 'id' | 'created_at'>>
+  ): Promise<FeePayment | null> {
+    return await FeePaymentRepository.update(paymentId, data);
+  }
+
+  static async deletePayment(paymentId: string): Promise<boolean> {
+    return await FeePaymentRepository.delete(paymentId);
+  }
+
+  static async getFinancialSummary(): Promise<PaymentSummary> {
+    return await StudentFeeRepository.getFinancialSummary();
+  }
+
+  // Helper method to calculate payment summary for a student fee
+  private static async calculatePaymentSummary(fee: StudentFee): Promise<StudentFee> {
+    const totalFees = fee.school_fee + fee.transport_fee;
+    const totalPaid = await FeePaymentRepository.getTotalPaidByStudentFeeId(fee.id);
+    const remainingBalance = totalFees - totalPaid;
+
+    return {
+      ...fee,
+      total_fees: totalFees,
+      total_paid: totalPaid,
+      remaining_balance: remainingBalance,
+    };
   }
 }
 
@@ -426,20 +669,52 @@ export class ComplaintService {
     return await ComplaintRepository.findById(id);
   }
 
-  static async submitComplaint(complaint: Omit<Complaint, 'id' | 'created_at' | 'status'>): Promise<Complaint | null> {
-    return await ComplaintRepository.create(complaint);
+  static async getDailyComplaintCount(parentId: string): Promise<number> {
+    return await ComplaintRepository.getDailyCount(parentId);
   }
 
-  static async updateComplaintStatus(id: string, status: Complaint['status']): Promise<Complaint | null> {
-    return await ComplaintRepository.updateStatus(id, status);
+  static async submitComplaint(
+    title: string,
+    message: string,
+    parentId: string
+  ): Promise<Complaint | null> {
+    return await ComplaintRepository.create(title, message, parentId);
+  }
+
+  static async updateComplaintStatus(
+    id: string,
+    status: string
+  ): Promise<Complaint | null> {
+    // Map Arabic status values to English DB status
+    const statusMap: Record<string, string> = {
+      'معلق': 'pending',
+      'تم المراجعة': 'in_progress',
+      'تم التنفيذ': 'resolved',
+      'مرفوض': 'closed',
+      'pending': 'pending',
+      'in_progress': 'in_progress',
+      'resolved': 'resolved',
+      'closed': 'closed',
+    };
+
+    const dbStatus = statusMap[status];
+    if (!dbStatus) {
+      throw new Error('Invalid status');
+    }
+
+    return await ComplaintRepository.updateStatus(id, dbStatus);
+  }
+
+  static async addReply(
+    id: string,
+    reply: string,
+    replied_by: string
+  ): Promise<Complaint | null> {
+    return await ComplaintRepository.addReply(id, reply, replied_by);
   }
 
   static async deleteComplaint(id: string): Promise<boolean> {
     return await ComplaintRepository.delete(id);
-  }
-
-  static async addReply(id: string, reply: string, replied_by?: string): Promise<Complaint | null> {
-    return await ComplaintRepository.addReply(id, reply, replied_by);
   }
 }
 
@@ -744,5 +1019,40 @@ export class AnnouncementService {
 
   static async deleteAnnouncement(id: string): Promise<boolean> {
     return await AnnouncementRepository.delete(id);
+  }
+}
+
+export class NewsService {
+  static async getAllNews(publishedOnly: boolean = false): Promise<News[]> {
+    return await NewsRepository.findAll(publishedOnly);
+  }
+
+  static async getNewsById(id: string, publishedOnly: boolean = false): Promise<News | null> {
+    return await NewsRepository.findById(id, publishedOnly);
+  }
+
+  static async createNews(newsData: Omit<News, 'id' | 'created_at' | 'updated_at'>): Promise<News | null> {
+    // Validate required fields
+    if (!newsData.title || !newsData.content) {
+      throw new Error('Title and content are required');
+    }
+
+    return await NewsRepository.create(newsData);
+  }
+
+  static async updateNews(id: string, newsData: Partial<News>): Promise<News | null> {
+    return await NewsRepository.update(id, newsData);
+  }
+
+  static async deleteNews(id: string): Promise<boolean> {
+    return await NewsRepository.delete(id);
+  }
+
+  static async togglePin(id: string): Promise<News | null> {
+    return await NewsRepository.togglePin(id);
+  }
+
+  static async togglePublish(id: string): Promise<News | null> {
+    return await NewsRepository.togglePublish(id);
   }
 }
