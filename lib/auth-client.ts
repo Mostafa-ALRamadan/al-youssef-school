@@ -30,15 +30,15 @@ export function getAuthHeaders(): Record<string, string> {
 }
 
 /**
- * Verify JWT token and return user data (browser-safe)
+ * Note: JWT verification should be done server-side for security
+ * This function only checks if token exists and has valid format
  */
-export async function verifyToken(token: string): Promise<AuthUser | null> {
+export function isTokenValid(token: string): boolean {
   try {
-    const JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET || 'fallback-secret-key';
-    const secret = new TextEncoder().encode(JWT_SECRET);
-    const { payload } = await jwtVerify(token, secret);
-    return payload as unknown as AuthUser;
+    // Basic format check - JWT has 3 parts separated by dots
+    const parts = token.split('.');
+    return parts.length === 3 && parts.every(part => part.length > 0);
   } catch (error) {
-    return null;
+    return false;
   }
 }
