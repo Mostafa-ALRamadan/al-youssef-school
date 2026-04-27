@@ -247,12 +247,21 @@ export interface SubjectContent {
 }
 
 export interface DashboardStats {
+  // Basic stats (all admins)
   totalStudents: number;
   totalTeachers: number;
   totalClasses: number;
-  attendanceRate: number;
-  pendingPayments: number;
+  todayPresent: number;
+  todayAbsent: number;
   newComplaints: number;
+  // Financial stats (main admin only)
+  totalFees?: number;
+  totalPaid?: number;
+  totalRemaining?: number;
+  // Recent activities
+  latestAnnouncement?: Announcement | null;
+  latestPayment?: FeePayment | null;
+  latestAttendance?: AttendanceRecord | null;
 }
 
 // Grades System Types
@@ -352,6 +361,7 @@ export interface News {
   summary?: string;
   content: string;
   image_url?: string;
+  video_url?: string;
   is_published: boolean;
   is_pinned: boolean;
   created_at: string;

@@ -1,0 +1,521 @@
+{
+  "info": {
+    "name": "Digital Content API",
+    "description": "API collection for testing Digital Content feature - Settings, Premium Videos, Access Codes, and Code Redemption",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Settings",
+      "item": [
+        {
+          "name": "GET Settings (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "settings"]
+            },
+            "description": "Get About Us video URL - No auth required"
+          },
+          "response": []
+        },
+        {
+          "name": "PUT Settings (Admin Only)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"about_video_url\": \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "settings"]
+            },
+            "description": "Update About Us video URL - Admin only"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Premium Videos",
+      "item": [
+        {
+          "name": "GET All Videos (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/premium-videos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "premium-videos"]
+            },
+            "description": "Get all premium videos - Admin only"
+          },
+          "response": []
+        },
+        {
+          "name": "POST Create Video (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Math Lesson 1\",\n  \"description\": \"Introduction to Algebra\",\n  \"youtube_url\": \"https://www.youtube.com/watch?v=123456\",\n  \"class_id\": \"{{classId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/premium-videos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "premium-videos"]
+            },
+            "description": "Create new premium video - Admin only. Save returned ID to videoId variable."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT Update Video (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Math Lesson 1 - Updated\",\n  \"description\": \"Updated description\",\n  \"youtube_url\": \"https://www.youtube.com/watch?v=123456\",\n  \"class_id\": \"{{classId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/premium-videos/{{videoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "premium-videos", "{{videoId}}"]
+            },
+            "description": "Update existing video - Admin only"
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE Video (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/premium-videos/{{videoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "premium-videos", "{{videoId}}"]
+            },
+            "description": "Delete video - Admin only"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Access Codes",
+      "item": [
+        {
+          "name": "GET All Codes (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/access-codes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "access-codes"]
+            },
+            "description": "Get all access codes with status - Admin only"
+          },
+          "response": []
+        },
+        {
+          "name": "POST Generate Codes (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 3,\n  \"class_id\": \"{{classId}}\",\n  \"expires_at\": \"2026-12-31T23:59:59\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/access-codes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "access-codes"]
+            },
+            "description": "Generate new access codes. Save one code to 'accessCode' variable and id to 'codeId'."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Generate Expired Code (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 1,\n  \"class_id\": \"{{classId}}\",\n  \"expires_at\": \"2020-01-01T00:00:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/access-codes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "access-codes"]
+            },
+            "description": "Generate expired code for testing. Save code to 'expiredCode' variable."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE Code (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/access-codes/{{codeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "access-codes", "{{codeId}}"]
+            },
+            "description": "Delete access code - Admin only"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Code Redemption (Parent)",
+      "item": [
+        {
+          "name": "POST Redeem Code - Success",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{parentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{accessCode}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/redeem-code",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "redeem-code"]
+            },
+            "description": "✅ TEST: Valid unused code - Should succeed and grant access"
+          },
+          "response": []
+        },
+        {
+          "name": "POST Redeem Code - Already Used",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{parentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{accessCode}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/redeem-code",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "redeem-code"]
+            },
+            "description": "❌ TEST: Same code again - Should fail with 'already used' error"
+          },
+          "response": []
+        },
+        {
+          "name": "POST Redeem Code - Invalid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{parentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"INVALIDCODE123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/redeem-code",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "redeem-code"]
+            },
+            "description": "❌ TEST: Invalid code - Should fail with 'invalid code' error"
+          },
+          "response": []
+        },
+        {
+          "name": "POST Redeem Code - Expired",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{parentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{expiredCode}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/redeem-code",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "redeem-code"]
+            },
+            "description": "❌ TEST: Expired code - Should fail with 'expired' error"
+          },
+          "response": []
+        },
+        {
+          "name": "GET Videos After Redeem (Parent)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{parentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/premium-videos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "premium-videos"]
+            },
+            "description": "✅ TEST: Parent views videos after redemption - Should see videos for student's class only"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Error Cases",
+      "item": [
+        {
+          "name": "No Auth Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/premium-videos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "premium-videos"]
+            },
+            "description": "❌ TEST: No Authorization header - Should return 401 Unauthorized"
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer invalid_token_here",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/premium-videos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "premium-videos"]
+            },
+            "description": "❌ TEST: Invalid token - Should return 401 or 403"
+          },
+          "response": []
+        },
+        {
+          "name": "Parent Tries Admin Endpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{parentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 1,\n  \"class_id\": \"{{classId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/access-codes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "access-codes"]
+            },
+            "description": "❌ TEST: Parent tries to generate codes - Should return 403 Forbidden"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string",
+      "description": "Paste admin JWT token here (localStorage.getItem('token'))"
+    },
+    {
+      "key": "parentToken",
+      "value": "",
+      "type": "string",
+      "description": "Login as parent and copy token here"
+    },
+    {
+      "key": "classId",
+      "value": "",
+      "type": "string",
+      "description": "UUID of a class from your database"
+    },
+    {
+      "key": "videoId",
+      "value": "",
+      "type": "string",
+      "description": "Will be auto-set after creating video"
+    },
+    {
+      "key": "accessCode",
+      "value": "",
+      "type": "string",
+      "description": "Will be auto-set after generating codes"
+    },
+    {
+      "key": "codeId",
+      "value": "",
+      "type": "string",
+      "description": "Will be auto-set after generating codes"
+    },
+    {
+      "key": "expiredCode",
+      "value": "",
+      "type": "string",
+      "description": "Will be auto-set after generating expired code"
+    }
+  ]
+}

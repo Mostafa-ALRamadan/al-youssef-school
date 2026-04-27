@@ -433,13 +433,18 @@ export class ClassRepository {
     }
   }
 
-  static async delete(id: string): Promise<boolean> {
+  static async delete(id: string): Promise<{ success: boolean; error?: string }> {
     try {
+      // First delete all access codes for this class
+      await query('DELETE FROM access_codes WHERE class_id = $1', [id]);
+      
+      // Then delete the class
       const result = await query('DELETE FROM classes WHERE id = $1 RETURNING *', [id]);
-      return result.rowCount !== null && result.rowCount > 0;
-    } catch (error) {
+      const deleted = result.rowCount !== null && result.rowCount > 0;
+      return { success: deleted };
+    } catch (error: any) {
       console.error('Error in ClassRepository.delete:', error);
-      return false;
+      return { success: false, error: error.message };
     }
   }
 
@@ -710,6 +715,38 @@ export class AttendanceRepository {
     } catch (error) {
       console.error('Error in AttendanceRepository.getTodayAttendanceRate:', error);
       return 0;
+    }
+  }
+
+  // Get today's attendance counts (present and absent)
+  static async getTodayStats(): Promise<{ present: number; absent: number }> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+
+      const sessionsResult = await query(
+        'SELECT id FROM attendance_sessions WHERE date = $1',
+        [today]
+      );
+
+      if (sessionsResult.rows.length === 0) {
+        return { present: 0, absent: 0 };
+      }
+
+      const sessionIds = sessionsResult.rows.map((s: any) => s.id);
+
+      const recordsResult = await query(
+        'SELECT status FROM attendance_records WHERE session_id = ANY($1)',
+        [sessionIds]
+      );
+
+      const records = recordsResult.rows;
+      const present = records.filter((r: any) => r.status === 'present').length;
+      const absent = records.filter((r: any) => r.status === 'absent').length;
+
+      return { present, absent };
+    } catch (error) {
+      console.error('Error in AttendanceRepository.getTodayStats:', error);
+      return { present: 0, absent: 0 };
     }
   }
 
@@ -1320,8 +1357,9 @@ export class TimeSlotRepository {
 }
 
 export class DashboardRepository {
-  static async getStats(): Promise<DashboardStats> {
-    const [totalStudents, totalTeachers, totalClasses, newComplaints] = 
+  // Get basic stats for all admins
+  static async getBasicStats(): Promise<DashboardStats> {
+    const [totalStudents, totalTeachers, totalClasses, newComplaints] =
       await Promise.all([
         StudentRepository.count(),
         TeacherRepository.count(),
@@ -1329,19 +1367,30 @@ export class DashboardRepository {
         ComplaintRepository.countNew(),
       ]);
 
-    const attendanceRate = await AttendanceRepository.getTodayAttendanceRate();
-
-    // Get financial summary for pending payments calculation
-    const financialSummary = await StudentFeeRepository.getFinancialSummary();
-    const pendingPayments = financialSummary.total_remaining > 0 ? 1 : 0;
+    const todayStats = await AttendanceRepository.getTodayStats();
 
     return {
       totalStudents,
       totalTeachers,
       totalClasses,
-      attendanceRate,
-      pendingPayments,
+      todayPresent: todayStats.present,
+      todayAbsent: todayStats.absent,
       newComplaints,
+    };
+  }
+
+  // Get full stats including financial data (main admin only)
+  static async getFullStats(): Promise<DashboardStats> {
+    const basicStats = await this.getBasicStats();
+
+    // Get financial summary
+    const financialSummary = await StudentFeeRepository.getFinancialSummary();
+
+    return {
+      ...basicStats,
+      totalFees: financialSummary.total_fees || 0,
+      totalPaid: financialSummary.total_paid || 0,
+      totalRemaining: financialSummary.total_remaining || 0,
     };
   }
 }
@@ -1787,12 +1836,12 @@ export class NewsRepository {
 
   static async create(news: Omit<News, 'id' | 'created_at' | 'updated_at'> & Record<string, any>): Promise<News | null> {
     try {
-      const { title, summary, content, image_url, is_published, is_pinned } = news;
+      const { title, summary, content, image_url, video_url, is_published, is_pinned } = news;
       const result = await query(
-        `INSERT INTO news (title, summary, content, image_url, is_published, is_pinned, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `INSERT INTO news (title, summary, content, image_url, video_url, is_published, is_pinned, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
          RETURNING *`,
-        [title, summary || null, content, image_url || null, is_published ?? true, is_pinned ?? false]
+        [title, summary || null, content, image_url || null, video_url || null, is_published ?? true, is_pinned ?? false]
       );
       return result.rows[0] as News;
     } catch (error) {
@@ -1822,6 +1871,10 @@ export class NewsRepository {
       if (news.image_url !== undefined) {
         updateFields.push(`image_url = $${paramIndex++}`);
         updateValues.push(news.image_url);
+      }
+      if (news.video_url !== undefined) {
+        updateFields.push(`video_url = $${paramIndex++}`);
+        updateValues.push(news.video_url);
       }
       if (news.is_published !== undefined) {
         updateFields.push(`is_published = $${paramIndex++}`);

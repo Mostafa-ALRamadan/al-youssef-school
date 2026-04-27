@@ -21,6 +21,7 @@ import { Teacher, Class, Subject, TeacherAssignment } from '@/types';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ADMIN_SIDEBAR_ITEMS } from '@/constants';
 import { formatDate } from '@/utils/date';
+import { getAuthHeaders } from '@/lib/auth-client';
 
 export default function TeacherAssignmentsPage() {
   const [loading, setLoading] = useState(true);
@@ -46,10 +47,10 @@ export default function TeacherAssignmentsPage() {
       if (showLoading) setLoading(true);
 
       const [assignmentsRes, teachersRes, classesRes, subjectsRes] = await Promise.all([
-        fetch('/api/teacher-assignments'),
-        fetch('/api/teachers'),
-        fetch('/api/classes'),
-        fetch('/api/subjects'),
+        fetch('/api/teacher-assignments', { headers: getAuthHeaders() }),
+        fetch('/api/teachers', { headers: getAuthHeaders() }),
+        fetch('/api/classes', { headers: getAuthHeaders() }),
+        fetch('/api/subjects', { headers: getAuthHeaders() }),
       ]);
 
       const assignmentsData = await assignmentsRes.json();
@@ -81,6 +82,7 @@ export default function TeacherAssignmentsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
         body: JSON.stringify(formData),
       });
@@ -106,6 +108,7 @@ export default function TeacherAssignmentsPage() {
     try {
       const response = await fetch(`/api/teacher-assignments/${selectedAssignment.id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {

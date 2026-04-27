@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ADMIN_SIDEBAR_ITEMS } from '@/constants';
 import { USER_ROLES } from '@/constants';
+import { getAuthHeaders } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -126,10 +127,10 @@ export default function AdminSchedulePage() {
       if (showLoading) setLoading(true);
 
       const [schedulesRes, assignmentsRes, classesRes, timeSlotsRes] = await Promise.all([
-        fetch('/api/weekly-schedule'),
-        fetch('/api/teacher-assignments'),
-        fetch('/api/classes'),
-        fetch('/api/time-slots'),
+        fetch('/api/weekly-schedule', { headers: getAuthHeaders() }),
+        fetch('/api/teacher-assignments', { headers: getAuthHeaders() }),
+        fetch('/api/classes', { headers: getAuthHeaders() }),
+        fetch('/api/time-slots', { headers: getAuthHeaders() }),
       ]);
 
       const schedulesData = await schedulesRes.json();

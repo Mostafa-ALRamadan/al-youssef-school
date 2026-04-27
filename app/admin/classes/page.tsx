@@ -120,9 +120,13 @@ export default function ClassesPage() {
         setIsDeleteDialogOpen(false);
         setSelectedClass(null);
         fetchClasses();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'فشل في حذف الصف');
       }
     } catch (error) {
       console.error('Error deleting class:', error);
+      alert('فشل في حذف الصف');
     }
   };
 

@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Edit2, Trash2, FileText, Image as ImageIcon, Newspaper, Upload, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, FileText, Image as ImageIcon, Newspaper, Upload, X, Video } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { TEACHER_SIDEBAR_ITEMS } from '@/constants';
 import Cropper from 'react-easy-crop';
@@ -36,6 +36,7 @@ interface TeacherPost {
   title: string;
   content: string;
   image_url: string | null;
+  video_url: string | null;
   created_at: string;
   teacher_name: string;
   class_name: string;
@@ -60,9 +61,11 @@ export default function TeacherPostsPage() {
     title: '',
     content: '',
     image_url: '',
+    video_url: '',
     class_id: '',
     subject_id: '',
   });
+  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
   
   const [assignments, setAssignments] = useState<{
     id: string;
@@ -178,6 +181,18 @@ export default function TeacherPostsPage() {
     setCroppedArea(croppedAreaPixels);
   };
 
+  // Helper function to convert YouTube URL to embed URL
+  const getYouTubeEmbedUrl = (url: string) => {
+    if (!url) return '';
+    // Extract video ID from various YouTube URL formats
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      return `https://www.youtube.com/embed/${match[2]}`;
+    }
+    return url;
+  };
+
   // Get cropped image as blob
   const getCroppedImage = async (): Promise<Blob | null> => {
     if (!imagePreview || !croppedArea) return null;
@@ -256,6 +271,8 @@ export default function TeacherPostsPage() {
     
     // Upload image if selected
     let imageUrl = formData.image_url;
+    let videoUrl = formData.video_url;
+    
     if (imageFile) {
       const uploadedUrl = await uploadCroppedImage();
       if (uploadedUrl) {
@@ -274,6 +291,7 @@ export default function TeacherPostsPage() {
           title: formData.title,
           content: formData.content,
           image_url: imageUrl,
+          video_url: videoUrl,
           class_id: formData.class_id,
           subject_id: formData.subject_id,
         }),
@@ -285,7 +303,7 @@ export default function TeacherPostsPage() {
           description: 'تم إنشاء المنشور بنجاح',
         });
         setIsAddDialogOpen(false);
-        setFormData({ title: '', content: '', image_url: '', class_id: '', subject_id: '' });
+        setFormData({ title: '', content: '', image_url: '', video_url: '', class_id: '', subject_id: '' });
         setImageFile(null);
         setImagePreview('');
         if (teacherId) fetchPosts(teacherId);
@@ -321,6 +339,8 @@ export default function TeacherPostsPage() {
     
     // Upload image if selected, otherwise keep existing or clear if removed
     let imageUrl = formData.image_url;
+    let videoUrl = formData.video_url;
+    
     if (imageFile) {
       // New image selected and cropped - upload it
       const uploadedUrl = await uploadCroppedImage();
@@ -343,6 +363,7 @@ export default function TeacherPostsPage() {
           title: formData.title,
           content: formData.content,
           image_url: imageUrl || null,
+          video_url: videoUrl,
           class_id: formData.class_id,
           subject_id: formData.subject_id,
         }),
@@ -355,7 +376,7 @@ export default function TeacherPostsPage() {
         });
         setIsEditDialogOpen(false);
         setSelectedPost(null);
-        setFormData({ title: '', content: '', image_url: '', class_id: '', subject_id: '' });
+        setFormData({ title: '', content: '', image_url: '', video_url: '', class_id: '', subject_id: '' });
         setImageFile(null);
         setImagePreview('');
         if (teacherId) fetchPosts(teacherId);
@@ -418,6 +439,7 @@ export default function TeacherPostsPage() {
       title: post.title || '',
       content: post.content,
       image_url: post.image_url || '',
+      video_url: post.video_url || '',
       class_id: post.class_id || '',
       subject_id: post.subject_id || '',
     });
@@ -461,7 +483,7 @@ export default function TeacherPostsPage() {
           </Button>
           
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogContent className="sm:max-w-[500px] [&>button]:hidden">
+            <DialogContent className="sm:max-w-[700px] [&>button]:hidden max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>إنشاء منشور جديد</DialogTitle>
               </DialogHeader>
@@ -524,68 +546,122 @@ export default function TeacherPostsPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label>الصورة (اختياري)</Label>
-                  {isCropping && imagePreview ? (
-                    <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden mb-4">
-                      <Cropper
-                        image={imagePreview}
-                        crop={crop}
-                        zoom={zoom}
-                        aspect={16 / 9}
-                        onCropChange={setCrop}
-                        onCropComplete={onCropComplete}
-                        onZoomChange={setZoom}
+                  <Label>الوسائط (صورة أو فيديو)</Label>
+                  <div className="flex gap-2 mb-2">
+                    <Button
+                      type="button"
+                      variant={mediaType === 'image' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setMediaType('image');
+                        setFormData(prev => ({ ...prev, video_url: '' }));
+                      }}
+                      className={mediaType === 'image' ? 'bg-brand-primary-blue' : ''}
+                    >
+                      <ImageIcon className="h-4 w-4 ml-1" />
+                      صورة
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={mediaType === 'video' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setMediaType('video');
+                        setFormData(prev => ({ ...prev, image_url: '' }));
+                        setImageFile(null);
+                        setImagePreview('');
+                      }}
+                      className={mediaType === 'video' ? 'bg-brand-primary-blue' : ''}
+                    >
+                      <Video className="h-4 w-4 ml-1" />
+                      فيديو
+                    </Button>
+                  </div>
+
+                  {mediaType === 'image' ? (
+                    <>
+                      {isCropping && imagePreview ? (
+                        <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden mb-4">
+                          <Cropper
+                            image={imagePreview}
+                            crop={crop}
+                            zoom={zoom}
+                            aspect={16 / 9}
+                            onCropChange={setCrop}
+                            onCropComplete={onCropComplete}
+                            onZoomChange={setZoom}
+                          />
+                          <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center bg-black/50 p-2 rounded">
+                            <div className="flex items-center gap-2">
+                              <span className="text-white text-xs">تكبير:</span>
+                              <input
+                                type="range"
+                                min={1}
+                                max={3}
+                                step={0.1}
+                                value={zoom}
+                                onChange={(e) => setZoom(Number(e.target.value))}
+                                className="w-20"
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => setIsCropping(false)}
+                              className="bg-white text-black hover:bg-gray-200"
+                            >
+                              تم
+                            </Button>
+                          </div>
+                        </div>
+                      ) : imagePreview ? (
+                        <div className="relative w-full h-40 rounded-lg overflow-hidden mb-2">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setImageFile(null);
+                              setImagePreview('');
+                            }}
+                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 w-6 h-6 flex items-center justify-center"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : null}
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="cursor-pointer"
                       />
-                      <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center bg-black/50 p-2 rounded">
-                        <div className="flex items-center gap-2">
-                          <span className="text-white text-xs">تكبير:</span>
-                          <input
-                            type="range"
-                            min={1}
-                            max={3}
-                            step={0.1}
-                            value={zoom}
-                            onChange={(e) => setZoom(Number(e.target.value))}
-                            className="w-20"
+                      {uploadingImage && (
+                        <p className="text-sm text-muted-foreground">جاري رفع الصورة...</p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      <Input
+                        value={formData.video_url}
+                        onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
+                        placeholder="رابط فيديو يوتيوب"
+                        dir="ltr"
+                      />
+                      {formData.video_url && (
+                        <div className="aspect-video w-full max-w-md">
+                          <iframe
+                            src={getYouTubeEmbedUrl(formData.video_url)}
+                            className="w-full h-full rounded-lg"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
                           />
                         </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => setIsCropping(false)}
-                          className="bg-white text-black hover:bg-gray-200"
-                        >
-                          تم
-                        </Button>
-                      </div>
+                      )}
                     </div>
-                  ) : imagePreview ? (
-                    <div className="relative w-full h-40 rounded-lg overflow-hidden mb-2">
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setImageFile(null);
-                          setImagePreview('');
-                        }}
-                        className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 w-6 h-6 flex items-center justify-center"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : null}
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="cursor-pointer"
-                  />
-                  {uploadingImage && (
-                    <p className="text-sm text-muted-foreground">جاري رفع الصورة...</p>
                   )}
                 </div>
                 
@@ -626,7 +702,20 @@ export default function TeacherPostsPage() {
                   </div>
                 )}
                 
-                {!post.image_url && (
+                {post.video_url && (
+                  <div className="h-53 bg-gray-100 flex items-center justify-center relative overflow-hidden">
+                    <img
+                      src={`https://img.youtube.com/vi/${getYouTubeEmbedUrl(post.video_url).split('/').pop()}/0.jpg`}
+                      alt="Video thumbnail"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+                
+                {!post.image_url && !post.video_url && (
                   <div className="h-40 bg-gray-100 flex items-center justify-center">
                     <ImageIcon className="h-12 w-12 text-gray-300" />
                   </div>
@@ -675,7 +764,7 @@ export default function TeacherPostsPage() {
         
         {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-[500px] [&>button]:hidden">
+            <DialogContent className="sm:max-w-[700px] [&>button]:hidden max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>تعديل المنشور</DialogTitle>
             </DialogHeader>
@@ -735,68 +824,122 @@ export default function TeacherPostsPage() {
               </div>
               
               <div className="space-y-2">
-                <Label>الصورة (اختياري)</Label>
-                {isCropping && imagePreview ? (
-                  <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden mb-4">
-                    <Cropper
-                      image={imagePreview}
-                      crop={crop}
-                      zoom={zoom}
-                      aspect={16 / 9}
-                      onCropChange={setCrop}
-                      onCropComplete={onCropComplete}
-                      onZoomChange={setZoom}
+                <Label>الوسائط (صورة أو فيديو)</Label>
+                <div className="flex gap-2 mb-2">
+                  <Button
+                    type="button"
+                    variant={mediaType === 'image' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setMediaType('image');
+                      setFormData(prev => ({ ...prev, video_url: '' }));
+                    }}
+                    className={mediaType === 'image' ? 'bg-brand-primary-blue' : ''}
+                  >
+                    <ImageIcon className="h-4 w-4 ml-1" />
+                    صورة
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={mediaType === 'video' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setMediaType('video');
+                      setFormData(prev => ({ ...prev, image_url: '' }));
+                      setImageFile(null);
+                      setImagePreview('');
+                    }}
+                    className={mediaType === 'video' ? 'bg-brand-primary-blue' : ''}
+                  >
+                    <Video className="h-4 w-4 ml-1" />
+                    فيديو
+                  </Button>
+                </div>
+
+                {mediaType === 'image' ? (
+                  <>
+                    {isCropping && imagePreview ? (
+                      <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden mb-4">
+                        <Cropper
+                          image={imagePreview}
+                          crop={crop}
+                          zoom={zoom}
+                          aspect={16 / 9}
+                          onCropChange={setCrop}
+                          onCropComplete={onCropComplete}
+                          onZoomChange={setZoom}
+                        />
+                        <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center bg-black/50 p-2 rounded">
+                          <div className="flex items-center gap-2">
+                            <span className="text-white text-xs">تكبير:</span>
+                            <input
+                              type="range"
+                              min={1}
+                              max={3}
+                              step={0.1}
+                              value={zoom}
+                              onChange={(e) => setZoom(Number(e.target.value))}
+                              className="w-20"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => setIsCropping(false)}
+                            className="bg-white text-black hover:bg-gray-200"
+                          >
+                            تم
+                          </Button>
+                        </div>
+                      </div>
+                    ) : imagePreview ? (
+                      <div className="relative w-full h-40 rounded-lg overflow-hidden mb-2">
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImageFile(null);
+                            setImagePreview('');
+                          }}
+                          className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 w-6 h-6 flex items-center justify-center"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : null}
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="cursor-pointer"
                     />
-                    <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center bg-black/50 p-2 rounded">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white text-xs">تكبير:</span>
-                        <input
-                          type="range"
-                          min={1}
-                          max={3}
-                          step={0.1}
-                          value={zoom}
-                          onChange={(e) => setZoom(Number(e.target.value))}
-                          className="w-20"
+                    {uploadingImage && (
+                      <p className="text-sm text-muted-foreground">جاري رفع الصورة...</p>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      value={formData.video_url}
+                      onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
+                      placeholder="رابط فيديو يوتيوب"
+                      dir="ltr"
+                    />
+                    {formData.video_url && (
+                      <div className="aspect-video w-full max-w-md">
+                        <iframe
+                          src={getYouTubeEmbedUrl(formData.video_url)}
+                          className="w-full h-full rounded-lg"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
                         />
                       </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => setIsCropping(false)}
-                        className="bg-white text-black hover:bg-gray-200"
-                      >
-                        تم
-                      </Button>
-                    </div>
+                    )}
                   </div>
-                ) : imagePreview ? (
-                  <div className="relative w-full h-40 rounded-lg overflow-hidden mb-2">
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageFile(null);
-                        setImagePreview('');
-                      }}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 w-6 h-6 flex items-center justify-center"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : null}
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className="cursor-pointer"
-                />
-                {uploadingImage && (
-                  <p className="text-sm text-muted-foreground">جاري رفع الصورة...</p>
                 )}
               </div>
               

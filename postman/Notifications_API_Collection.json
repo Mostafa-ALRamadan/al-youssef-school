@@ -1,0 +1,160 @@
+{
+  "info": {
+    "_postman_id": "school-notifications-api",
+    "name": "School Notifications API",
+    "description": "API collection for testing parent notifications system",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Notifications",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/notifications",
+          "host": ["{{base_url}}"],
+          "path": ["api", "notifications"]
+        },
+        "description": "Fetch all notifications for logged-in parent user"
+      },
+      "response": [
+        {
+          "name": "Success - Has Notifications",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/notifications"
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"notifications\": [\n    {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"title\": \"درجة جديدة\",\n      \"message\": \"تم إضافة درجة جديدة لابنك/ابنتك في مادة الرياضيات\",\n      \"type\": \"grade\",\n      \"is_read\": false,\n      \"created_at\": \"2026-04-27T10:30:00.000Z\"\n    },\n    {\n      \"id\": \"b2c3d4e5-f6g7-8901-bcde-f12345678901\",\n      \"title\": \"غياب الطالب\",\n      \"message\": \"تم تسجيل غياب ابنك/ابنتك اليوم\",\n      \"type\": \"attendance\",\n      \"is_read\": false,\n      \"created_at\": \"2026-04-26T08:00:00.000Z\"\n    },\n    {\n      \"id\": \"c3d4e5f6-g7h8-9012-cdef-123456789012\",\n      \"title\": \"منشور جديد من المعلم\",\n      \"message\": \"نشر معلم اللغة العربية منشوراً جديداً لصف الصف الأول\",\n      \"type\": \"post\",\n      \"is_read\": true,\n      \"created_at\": \"2026-04-25T14:00:00.000Z\"\n    }\n  ],\n  \"unreadCount\": 2\n}"
+        },
+        {
+          "name": "Success - No Notifications",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/notifications"
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"notifications\": [],\n  \"unreadCount\": 0\n}"
+        }
+      ]
+    },
+    {
+      "name": "Mark Notification as Read",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/notifications/{{notification_id}}/read",
+          "host": ["{{base_url}}"],
+          "path": ["api", "notifications", "{{notification_id}}", "read"]
+        },
+        "description": "Mark a specific notification as read for the logged-in user"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{base_url}}/api/notifications/a1b2c3d4-e5f6-7890-abcd-ef1234567890/read"
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"success\": true\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get Notifications (Unauthorized - No Token)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/notifications",
+          "host": ["{{base_url}}"],
+          "path": ["api", "notifications"]
+        },
+        "description": "Test without authorization token - should return 401"
+      },
+      "response": [
+        {
+          "name": "Unauthorized",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/notifications"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"error\": \"Unauthorized - No token provided\"\n}"
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "YOUR_PARENT_JWT_TOKEN_HERE",
+      "type": "string"
+    },
+    {
+      "key": "notification_id",
+      "value": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "type": "string"
+    }
+  ]
+}

@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
         tp.title,
         tp.content,
         tp.image_url,
+        tp.video_url,
         tp.created_at,
         t.name as teacher_name,
         c.name as class_name,
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const { title, content, image_url, class_id, subject_id } = body;
+    const { title, content, image_url, video_url, class_id, subject_id } = body;
     
     if (!content) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 });
@@ -155,10 +156,10 @@ export async function POST(request: NextRequest) {
     
     // Create the post
     const insertResult = await query(
-      `INSERT INTO teacher_posts (teacher_id, class_id, subject_id, semester_id, title, content, image_url)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO teacher_posts (teacher_id, class_id, subject_id, semester_id, title, content, image_url, video_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [teacherId, class_id, subject_id, semesterId, title || null, content, image_url || null]
+      [teacherId, class_id, subject_id, semesterId, title || null, content, image_url || null, video_url || null]
     );
     
     return NextResponse.json({ post: insertResult.rows[0] }, { status: 201 });

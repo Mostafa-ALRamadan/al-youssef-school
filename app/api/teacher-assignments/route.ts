@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TeacherAssignmentService } from '@/services';
 import { SUCCESS_MESSAGES, ERROR_MESSAGES } from '@/constants';
-import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { query } from '@/lib/db';
 
@@ -11,16 +10,11 @@ import { query } from '@/lib/db';
  */
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
-    const cookieStore = await cookies();
-    let token = cookieStore.get('auth_token')?.value;
-    
-    // If no cookie, check Authorization header
-    if (!token) {
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        token = authHeader.substring(7);
-      }
+    // Check authentication via Authorization header
+    const authHeader = request.headers.get('Authorization');
+    let token = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
     }
     
     if (!token) {
@@ -34,10 +28,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
     
-    if (decoded?.role !== 'teacher') {
-      return NextResponse.json({ error: 'Only teachers can access this' }, { status: 403 });
+    if (decoded?.role !== 'teacher' && decoded?.role !== 'admin') {
+      return NextResponse.json({ error: 'Only teachers and admins can access this' }, { status: 403 });
     }
     
+    // Admin sees all assignments
+    if (decoded?.role === 'admin') {
+      const assignments = await query(
+        `SELECT 
+          ta.id,
+          ta.teacher_id,
+          t.name as teacher_name,
+          ta.class_id,
+          c.name as class_name,
+          ta.subject_id,
+          s.name as subject_name,
+          ta.created_at
+         FROM teacher_assignments ta
+         JOIN teachers t ON ta.teacher_id = t.id
+         JOIN classes c ON ta.class_id = c.id
+         JOIN subjects s ON ta.subject_id = s.id
+         ORDER BY t.name, c.name`
+      );
+      return NextResponse.json({ assignments: assignments.rows });
+    }
+    
+    // Teacher sees only their assignments
     // Get teacher_id from user_id
     const teacherResult = await query(
       'SELECT id FROM teachers WHERE user_id = $1',
@@ -57,7 +73,8 @@ export async function GET(request: NextRequest) {
         ta.class_id,
         c.name as class_name,
         ta.subject_id,
-        s.name as subject_name
+        s.name as subject_name,
+        ta.created_at
        FROM teacher_assignments ta
        JOIN classes c ON ta.class_id = c.id
        JOIN subjects s ON ta.subject_id = s.id

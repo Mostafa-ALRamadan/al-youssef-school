@@ -29,7 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Pencil, Trash2, Eye, EyeOff, Pin, PinOff, Upload, X, Newspaper } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, EyeOff, Pin, PinOff, Upload, X, Newspaper, Image as ImageIcon, Video } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Cropper from 'react-easy-crop';
@@ -44,6 +44,7 @@ type News = {
   summary: string | null;
   content: string;
   image_url: string | null;
+  video_url: string | null;
   is_published: boolean;
   is_pinned: boolean;
   created_at: string;
@@ -65,9 +66,11 @@ export default function NewsPage() {
     summary: '',
     content: '',
     image_url: '',
+    video_url: '',
     is_published: true,
     is_pinned: false,
   });
+  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
 
   // Image cropper states
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -102,9 +105,11 @@ export default function NewsPage() {
       summary: '',
       content: '',
       image_url: '',
+      video_url: '',
       is_published: true,
       is_pinned: false,
     });
+    setMediaType('image');
     setImageFile(null);
     setImagePreview('');
     setIsCropping(false);
@@ -125,10 +130,12 @@ export default function NewsPage() {
       summary: newsItem.summary || '',
       content: newsItem.content,
       image_url: newsItem.image_url || '',
+      video_url: newsItem.video_url || '',
       is_published: newsItem.is_published,
       is_pinned: newsItem.is_pinned,
     });
     setImagePreview(newsItem.image_url || '');
+    setMediaType(newsItem.video_url ? 'video' : 'image');
     setIsEditDialogOpen(true);
   };
 
@@ -198,6 +205,7 @@ export default function NewsPage() {
     try {
       const response = await fetch('/api/upload', {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: uploadFormData,
       });
 
@@ -217,6 +225,17 @@ export default function NewsPage() {
     setImageFile(null);
     setImagePreview('');
     setFormData(prev => ({ ...prev, image_url: '' }));
+  };
+
+  const getYouTubeEmbedUrl = (url: string) => {
+    if (!url) return '';
+    // Extract video ID from various YouTube URL formats
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      return `https://www.youtube.com/embed/${match[2]}`;
+    }
+    return url;
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -468,76 +487,127 @@ export default function NewsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>الصورة</Label>
-                <div className="flex items-center gap-4">
-                  {isCropping ? (
-                    <div className="flex flex-col items-center gap-2 w-full">
-                      <div className="relative w-full h-64">
-                        <Cropper
-                          image={imagePreviewForCrop}
-                          crop={crop}
-                          zoom={zoom}
-                          aspect={16 / 9}
-                          onCropChange={setCrop}
-                          onZoomChange={setZoom}
-                          onCropComplete={onCropComplete}
+                <Label>الوسائط (صورة أو فيديو)</Label>
+                <div className="flex gap-2 mb-2">
+                  <Button
+                    type="button"
+                    variant={mediaType === 'image' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setMediaType('image');
+                      setFormData(prev => ({ ...prev, video_url: '' }));
+                    }}
+                    className={mediaType === 'image' ? 'bg-brand-primary-blue' : ''}
+                  >
+                    <ImageIcon className="h-4 w-4 ml-1" />
+                    صورة
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={mediaType === 'video' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setMediaType('video');
+                      setFormData(prev => ({ ...prev, image_url: '' }));
+                      setImagePreview('');
+                    }}
+                    className={mediaType === 'video' ? 'bg-brand-primary-blue' : ''}
+                  >
+                    <Video className="h-4 w-4 ml-1" />
+                    فيديو
+                  </Button>
+                </div>
+
+                {mediaType === 'image' ? (
+                  <div className="flex items-center gap-4">
+                    {isCropping ? (
+                      <div className="flex flex-col items-center gap-2 w-full">
+                        <div className="relative w-full h-64">
+                          <Cropper
+                            image={imagePreviewForCrop}
+                            crop={crop}
+                            zoom={zoom}
+                            aspect={16 / 9}
+                            onCropChange={setCrop}
+                            onZoomChange={setZoom}
+                            onCropComplete={onCropComplete}
+                          />
+                        </div>
+                        <div className="flex gap-2 w-full">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setIsCropping(false);
+                              setImageFile(null);
+                              setImagePreviewForCrop('');
+                            }}
+                            className="flex-1"
+                          >
+                            <X className="h-4 w-4 ml-1" />
+                            إلغاء
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={uploadCroppedImage}
+                            className="flex-1 bg-brand-primary-blue"
+                          >
+                            <Upload className="h-4 w-4 ml-1" />
+                            تأكيد القص
+                          </Button>
+                        </div>
+                      </div>
+                    ) : formData.image_url ? (
+                      <div className="relative w-32 h-32">
+                        <Image
+                          src={formData.image_url}
+                          alt="Preview"
+                          fill
+                          className="object-cover rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeImage}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <Upload className="h-6 w-6 text-gray-400" />
+                        <span className="text-xs text-gray-500 mt-1">رفع صورة</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageSelect}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      value={formData.video_url}
+                      onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
+                      placeholder="رابط فيديو يوتيوب"
+                      dir="ltr"
+                    />
+                    {formData.video_url && (
+                      <div className="aspect-video w-full max-w-md">
+                        <iframe
+                          src={getYouTubeEmbedUrl(formData.video_url)}
+                          className="w-full h-full rounded-lg"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
                         />
                       </div>
-                      <div className="flex gap-2 w-full">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setIsCropping(false);
-                            setImageFile(null);
-                            setImagePreviewForCrop('');
-                          }}
-                          className="flex-1"
-                        >
-                          <X className="h-4 w-4 ml-1" />
-                          إلغاء
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={uploadCroppedImage}
-                          className="flex-1 bg-brand-primary-blue"
-                        >
-                          <Upload className="h-4 w-4 ml-1" />
-                          تأكيد القص
-                        </Button>
-                      </div>
-                    </div>
-                  ) : formData.image_url ? (
-                    <div className="relative w-32 h-32">
-                      <Image
-                        src={formData.image_url}
-                        alt="Preview"
-                        fill
-                        className="object-cover rounded-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={removeImage}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-                      <Upload className="h-6 w-6 text-gray-400" />
-                      <span className="text-xs text-gray-500 mt-1">رفع صورة</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageSelect}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-6">
@@ -617,76 +687,127 @@ export default function NewsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>الصورة</Label>
-                <div className="flex items-center gap-4">
-                  {isCropping ? (
-                    <div className="flex flex-col items-center gap-2 w-full">
-                      <div className="relative w-full h-64">
-                        <Cropper
-                          image={imagePreviewForCrop}
-                          crop={crop}
-                          zoom={zoom}
-                          aspect={16 / 9}
-                          onCropChange={setCrop}
-                          onZoomChange={setZoom}
-                          onCropComplete={onCropComplete}
+                <Label>الوسائط (صورة أو فيديو)</Label>
+                <div className="flex gap-2 mb-2">
+                  <Button
+                    type="button"
+                    variant={mediaType === 'image' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setMediaType('image');
+                      setFormData(prev => ({ ...prev, video_url: '' }));
+                    }}
+                    className={mediaType === 'image' ? 'bg-brand-primary-blue' : ''}
+                  >
+                    <ImageIcon className="h-4 w-4 ml-1" />
+                    صورة
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={mediaType === 'video' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setMediaType('video');
+                      setFormData(prev => ({ ...prev, image_url: '' }));
+                      setImagePreview('');
+                    }}
+                    className={mediaType === 'video' ? 'bg-brand-primary-blue' : ''}
+                  >
+                    <Video className="h-4 w-4 ml-1" />
+                    فيديو
+                  </Button>
+                </div>
+
+                {mediaType === 'image' ? (
+                  <div className="flex items-center gap-4">
+                    {isCropping ? (
+                      <div className="flex flex-col items-center gap-2 w-full">
+                        <div className="relative w-full h-64">
+                          <Cropper
+                            image={imagePreviewForCrop}
+                            crop={crop}
+                            zoom={zoom}
+                            aspect={16 / 9}
+                            onCropChange={setCrop}
+                            onZoomChange={setZoom}
+                            onCropComplete={onCropComplete}
+                          />
+                        </div>
+                        <div className="flex gap-2 w-full">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setIsCropping(false);
+                              setImageFile(null);
+                              setImagePreviewForCrop('');
+                            }}
+                            className="flex-1"
+                          >
+                            <X className="h-4 w-4 ml-1" />
+                            إلغاء
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={uploadCroppedImage}
+                            className="flex-1 bg-brand-primary-blue"
+                          >
+                            <Upload className="h-4 w-4 ml-1" />
+                            تأكيد القص
+                          </Button>
+                        </div>
+                      </div>
+                    ) : formData.image_url ? (
+                      <div className="relative w-32 h-32">
+                        <Image
+                          src={formData.image_url}
+                          alt="Preview"
+                          fill
+                          className="object-cover rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeImage}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <Upload className="h-6 w-6 text-gray-400" />
+                        <span className="text-xs text-gray-500 mt-1">رفع صورة</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageSelect}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      value={formData.video_url}
+                      onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
+                      placeholder="رابط فيديو يوتيوب"
+                      dir="ltr"
+                    />
+                    {formData.video_url && (
+                      <div className="aspect-video w-full max-w-md">
+                        <iframe
+                          src={getYouTubeEmbedUrl(formData.video_url)}
+                          className="w-full h-full rounded-lg"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
                         />
                       </div>
-                      <div className="flex gap-2 w-full">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setIsCropping(false);
-                            setImageFile(null);
-                            setImagePreviewForCrop('');
-                          }}
-                          className="flex-1"
-                        >
-                          <X className="h-4 w-4 ml-1" />
-                          إلغاء
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={uploadCroppedImage}
-                          className="flex-1 bg-brand-primary-blue"
-                        >
-                          <Upload className="h-4 w-4 ml-1" />
-                          تأكيد القص
-                        </Button>
-                      </div>
-                    </div>
-                  ) : formData.image_url ? (
-                    <div className="relative w-32 h-32">
-                      <Image
-                        src={formData.image_url}
-                        alt="Preview"
-                        fill
-                        className="object-cover rounded-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={removeImage}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-                      <Upload className="h-6 w-6 text-gray-400" />
-                      <span className="text-xs text-gray-500 mt-1">رفع صورة</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageSelect}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-6">

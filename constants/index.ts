@@ -27,9 +27,11 @@ export const SIDEBAR_ITEMS = [
   { id: 'grades', label: 'العلامات', icon: 'Award', href: '/admin/grades' },
   { id: 'schedule', label: 'البرنامج الأسبوعي', icon: 'Calendar', href: '/admin/schedule' },
   { id: 'complaints', label: 'صندوق الشكاوي', icon: 'MessageSquare', href: '/admin/complaints', requiresMainAdmin: true },
+  { id: 'digital-content', label: 'المحتوى الرقمي', icon: 'Video', href: '/admin/digital-content', requiresMainAdmin: true },
   { id: 'evaluations', label: 'تقييم الطلاب', icon: 'Star', href: '/admin/evaluations' },
   { id: 'stars-of-the-year', label: 'نجوم السنة', icon: 'Trophy', href: '/admin/stars-of-the-year' },
   { id: 'users', label: 'المستخدمين', icon: 'Users', href: '/admin/users' },
+  { id: 'notifications', label: 'الإشعارات', icon: 'Bell', href: '/admin/notifications', requiresMainAdmin: true },
 ] as const;
 
 export const ADMIN_SIDEBAR_ITEMS = [

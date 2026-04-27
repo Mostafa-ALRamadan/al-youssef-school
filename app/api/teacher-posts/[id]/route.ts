@@ -39,7 +39,7 @@ export async function PUT(
     }
     
     const body = await request.json();
-    const { title, content, image_url, class_id, subject_id } = body;
+    const { title, content, image_url, video_url, class_id, subject_id } = body;
     
     if (!content) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 });
@@ -87,10 +87,10 @@ export async function PUT(
     // Update the post
     const updateResult = await query(
       `UPDATE teacher_posts 
-       SET title = $1, content = $2, image_url = $3, class_id = $4, subject_id = $5
-       WHERE id = $6
+       SET title = $1, content = $2, image_url = $3, video_url = $4, class_id = $5, subject_id = $6
+       WHERE id = $7
        RETURNING *`,
-      [title || null, content, image_url || null, class_id, subject_id, id]
+      [title || null, content, image_url || null, video_url || null, class_id, subject_id, id]
     );
     
     // Delete old image file if it exists and is different from new one

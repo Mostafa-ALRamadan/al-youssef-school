@@ -30,6 +30,8 @@ import {
   ChevronLeft,
   Newspaper,
   Wallet,
+  Video,
+  Bell,
 } from 'lucide-react';
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -49,6 +51,8 @@ const iconMap: Record<string, React.ReactNode> = {
   Trophy: <Trophy className="h-5 w-5" />,
   Newspaper: <Newspaper className="h-5 w-5" />,
   Wallet: <Wallet className="h-5 w-5" />,
+  Video: <Video className="h-5 w-5" />,
+  Bell: <Bell className="h-5 w-5" />,
 };
 
 interface SidebarItem {

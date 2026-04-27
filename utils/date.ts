@@ -53,8 +53,20 @@ export const formatDateTime = (date: string | Date): string => {
   const year = d.getFullYear();
   const hours = d.getHours().toString().padStart(2, '0');
   const minutes = d.getMinutes().toString().padStart(2, '0');
-  
+
   return `${toArabicNumerals(day)}/${toArabicNumerals(month)}/${toArabicNumerals(year)} ${toArabicNumerals(hours)}:${toArabicNumerals(minutes)}`;
+};
+
+// Format date with time as YYYY/MM/DD HH:MM (RTL format like other admin pages)
+export const formatDateTimeRTL = (date: string | Date): string => {
+  const d = new Date(date);
+  const day = d.getDate();
+  const month = d.getMonth() + 1;
+  const year = d.getFullYear();
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+
+  return `${toArabicNumerals(year)}/${toArabicNumerals(month)}/${toArabicNumerals(day)} ${toArabicNumerals(hours)}:${toArabicNumerals(minutes)}`;
 };
 
 // Format time only as HH:MM with AM/PM in Arabic

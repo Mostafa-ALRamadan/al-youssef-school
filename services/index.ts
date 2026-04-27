@@ -288,7 +288,7 @@ export class ClassService {
     return await ClassRepository.update(id, updates);
   }
 
-  static async deleteClass(id: string) {
+  static async deleteClass(id: string): Promise<{ success: boolean; error?: string }> {
     return await ClassRepository.delete(id);
   }
 
@@ -719,8 +719,19 @@ export class ComplaintService {
 }
 
 export class DashboardService {
+  // Get basic stats for all admins
+  static async getBasicStats(): Promise<DashboardStats> {
+    return await DashboardRepository.getBasicStats();
+  }
+
+  // Get full stats including financial data (main admin only)
+  static async getFullStats(): Promise<DashboardStats> {
+    return await DashboardRepository.getFullStats();
+  }
+
+  // Legacy method - redirects to getBasicStats
   static async getDashboardStats(): Promise<DashboardStats> {
-    return await DashboardRepository.getStats();
+    return await DashboardRepository.getBasicStats();
   }
 }
 

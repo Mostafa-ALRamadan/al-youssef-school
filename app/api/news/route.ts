@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       summary,
       content,
       image_url,
+      video_url,
       is_published = true,
       is_pinned = false,
     } = body;
@@ -63,6 +64,7 @@ export async function POST(request: NextRequest) {
       summary,
       content,
       image_url,
+      video_url,
       is_published,
       is_pinned,
     });

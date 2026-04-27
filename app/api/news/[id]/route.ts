@@ -66,6 +66,7 @@ export async function PUT(
       summary,
       content,
       image_url,
+      video_url,
       is_published,
       is_pinned,
     } = body;
@@ -95,7 +96,7 @@ export async function PUT(
 
     // Check if any fields were provided
     const hasUpdates = title !== undefined || summary !== undefined || content !== undefined ||
-                       image_url !== undefined || is_published !== undefined || is_pinned !== undefined;
+                       image_url !== undefined || video_url !== undefined || is_published !== undefined || is_pinned !== undefined;
 
     if (!hasUpdates) {
       return NextResponse.json(
@@ -109,6 +110,7 @@ export async function PUT(
       summary,
       content,
       image_url,
+      video_url,
       is_published,
       is_pinned,
     });

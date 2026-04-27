@@ -223,8 +223,8 @@ CREATE TABLE IF NOT EXISTS student_fees (
     academic_year_id UUID REFERENCES academic_years(id),
     school_fee NUMERIC NOT NULL DEFAULT 0,
     transport_fee NUMERIC NOT NULL DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_student_year_fee UNIQUE (student_id, academic_year_id)
 );
 
@@ -242,7 +242,7 @@ CREATE TABLE IF NOT EXISTS fee_payments (
     payment_method TEXT DEFAULT 'cash',
     notes TEXT,
     created_by UUID REFERENCES users(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT payment_method_check CHECK (payment_method IN ('cash', 'bank', 'online'))
 );
 
@@ -346,6 +346,7 @@ CREATE TABLE IF NOT EXISTS news (
     summary TEXT,
     content TEXT NOT NULL,
     image_url TEXT,
+    video_url TEXT,
     is_published BOOLEAN DEFAULT true,
     is_pinned BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -371,13 +372,75 @@ CREATE TABLE IF NOT EXISTS teacher_posts (
     title TEXT,
     content TEXT NOT NULL,
     image_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+    video_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_teacher_posts_teacher_id ON teacher_posts(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_teacher_posts_class_id ON teacher_posts(class_id);
 CREATE INDEX IF NOT EXISTS idx_teacher_posts_semester_id ON teacher_posts(semester_id);
 CREATE INDEX IF NOT EXISTS idx_teacher_posts_created_at ON teacher_posts(created_at DESC);
+
+-- ============================================================================
+-- 24. APP SETTINGS TABLE (About Us Video)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS app_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    about_video_url TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER update_app_settings_updated_at BEFORE UPDATE ON app_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Insert default row if not exists
+INSERT INTO app_settings (id, about_video_url)
+SELECT gen_random_uuid(), NULL
+WHERE NOT EXISTS (SELECT 1 FROM app_settings);
+
+-- ============================================================================
+-- 25. PREMIUM VIDEOS TABLE (Educational Videos)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS premium_videos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    description TEXT,
+    youtube_url TEXT NOT NULL,
+    class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_premium_videos_class_id ON premium_videos(class_id);
+CREATE INDEX IF NOT EXISTS idx_premium_videos_created_at ON premium_videos(created_at DESC);
+
+-- ============================================================================
+-- 26. ACCESS CODES TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS access_codes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code TEXT UNIQUE NOT NULL,
+    class_id UUID REFERENCES classes(id),
+    is_used BOOLEAN DEFAULT false,
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_access_codes_code ON access_codes(code);
+CREATE INDEX IF NOT EXISTS idx_access_codes_class_id ON access_codes(class_id);
+CREATE INDEX IF NOT EXISTS idx_access_codes_is_used ON access_codes(is_used);
+
+-- ============================================================================
+-- 27. STUDENT VIDEO ACCESS TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS student_video_access (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+    access_code_id UUID REFERENCES access_codes(id) ON DELETE CASCADE,
+    activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_student_video_access_student_id ON student_video_access(student_id);
+CREATE INDEX IF NOT EXISTS idx_student_video_access_code_id ON student_video_access(access_code_id);
+CREATE UNIQUE INDEX idx_student_video_access_unique ON student_video_access(student_id, access_code_id);
 
 -- ============================================================================
 -- TRIGGERS FOR UPDATED_AT
@@ -394,6 +457,206 @@ CREATE TRIGGER update_academic_years_updated_at BEFORE UPDATE ON academic_years 
 CREATE TRIGGER update_classes_updated_at BEFORE UPDATE ON classes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_teachers_updated_at BEFORE UPDATE ON teachers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- ============================================================================
+-- 28. NOTIFICATIONS TABLE
+-- ============================================================================
+-- Note: user_id references parents.id (not users.id) since parent login JWT uses parent.id
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES parents(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+
+CREATE TRIGGER update_notifications_updated_at BEFORE UPDATE ON notifications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- NOTIFICATION CREATION FUNCTION AND TRIGGERS
+-- ============================================================================
+
+-- Function to create notification for parent
+-- (Parents have their own JWT token with parent.id)
+CREATE OR REPLACE FUNCTION create_parent_notification(
+    p_student_id UUID,
+    p_title TEXT,
+    p_message TEXT,
+    p_type TEXT
+) RETURNS VOID AS $$
+DECLARE
+    parent_id UUID;
+BEGIN
+    -- Get parent_id from student
+    SELECT s.parent_id INTO parent_id
+    FROM students s
+    WHERE s.id = p_student_id;
+
+    -- Create notification if parent found
+    IF parent_id IS NOT NULL THEN
+        INSERT INTO notifications (user_id, title, message, type)
+        VALUES (parent_id, p_title, p_message, p_type);
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger function for grades
+CREATE OR REPLACE FUNCTION notify_on_grade()
+RETURNS TRIGGER AS $$
+DECLARE
+    subject_name TEXT;
+    student_name TEXT;
+    student_gender VARCHAR(10);
+    gender_text TEXT;
+BEGIN
+    -- Get subject name via exam join
+    SELECT s.name INTO subject_name
+    FROM exams e
+    JOIN subjects s ON e.subject_id = s.id
+    WHERE e.id = NEW.exam_id;
+
+    -- Get student name and gender
+    SELECT s.name, s.gender INTO student_name, student_gender
+    FROM students s
+    WHERE s.id = NEW.student_id;
+
+    -- Set gender-specific text
+    IF student_gender = 'male' THEN
+        gender_text := 'لابنك';
+    ELSIF student_gender = 'female' THEN
+        gender_text := 'لابنتك';
+    ELSE
+        gender_text := 'لطفلك';
+    END IF;
+
+    -- Create notification for parent with student name
+    PERFORM create_parent_notification(
+        NEW.student_id,
+        'درجة جديدة',
+        'تم إضافة درجة جديدة ' || gender_text || ' ' || COALESCE(student_name, '') || ' في مادة ' || COALESCE(subject_name, 'غير محدد'),
+        'grade'
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER notify_parent_on_grade
+AFTER INSERT ON grades
+FOR EACH ROW
+EXECUTE FUNCTION notify_on_grade();
+
+-- Trigger function for attendance (absent only)
+CREATE OR REPLACE FUNCTION notify_on_absence()
+RETURNS TRIGGER AS $$
+DECLARE
+    student_name TEXT;
+    student_gender VARCHAR(10);
+    gender_text TEXT;
+BEGIN
+    IF NEW.status = 'absent' THEN
+        -- Get student name and gender
+        SELECT s.name, s.gender INTO student_name, student_gender
+        FROM students s
+        WHERE s.id = NEW.student_id;
+
+        -- Set gender-specific text
+        IF student_gender = 'male' THEN
+            gender_text := 'ابنك';
+        ELSIF student_gender = 'female' THEN
+            gender_text := 'ابنتك';
+        ELSE
+            gender_text := 'طفلك';
+        END IF;
+
+        PERFORM create_parent_notification(
+            NEW.student_id,
+            'غياب الطالب',
+            'تم تسجيل غياب ' || gender_text || ' ' || COALESCE(student_name, '') || ' اليوم',
+            'attendance'
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER notify_parent_on_absence
+AFTER INSERT ON attendance_records
+FOR EACH ROW
+EXECUTE FUNCTION notify_on_absence();
+
+-- Trigger function for teacher posts (notify all parents in the class)
+CREATE OR REPLACE FUNCTION notify_on_teacher_post()
+RETURNS TRIGGER AS $$
+DECLARE
+    parent_rec RECORD;
+    teacher_name TEXT;
+    class_name TEXT;
+BEGIN
+    -- Get teacher and class names
+    SELECT t.name INTO teacher_name
+    FROM teachers t
+    WHERE t.id = NEW.teacher_id;
+
+    SELECT c.name INTO class_name
+    FROM classes c
+    WHERE c.id = NEW.class_id;
+
+    -- Notify all parents in the class (use parent.id directly)
+    FOR parent_rec IN
+        SELECT DISTINCT s.parent_id
+        FROM students s
+        WHERE s.class_id = NEW.class_id
+    LOOP
+        INSERT INTO notifications (user_id, title, message, type)
+        VALUES (
+            parent_rec.parent_id,
+            'منشور جديد من المعلم',
+            'نشر المعلم ' || COALESCE(teacher_name, '') || ' منشوراً جديداً ضمن ' || COALESCE(class_name, ''),
+            'post'
+        );
+    END LOOP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER notify_parents_on_teacher_post
+AFTER INSERT ON teacher_posts
+FOR EACH ROW
+EXECUTE FUNCTION notify_on_teacher_post();
+
+-- Trigger function for announcements (notify all parents)
+CREATE OR REPLACE FUNCTION notify_on_announcement()
+RETURNS TRIGGER AS $$
+DECLARE
+    parent_rec RECORD;
+BEGIN
+    -- Notify all parents (use parent.id directly from students)
+    FOR parent_rec IN
+        SELECT DISTINCT s.parent_id
+        FROM students s
+    LOOP
+        INSERT INTO notifications (user_id, title, message, type)
+        VALUES (
+            parent_rec.parent_id,
+            'إعلان جديد',
+            'إعلان جديد: ' || NEW.title,
+            'announcement'
+        );
+    END LOOP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER notify_parents_on_announcement
+AFTER INSERT ON announcements
+FOR EACH ROW
+EXECUTE FUNCTION notify_on_announcement();
+
 CREATE TRIGGER update_students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_announcements_updated_at BEFORE UPDATE ON announcements FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_complaints_updated_at BEFORE UPDATE ON complaints FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

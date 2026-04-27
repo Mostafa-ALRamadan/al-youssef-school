@@ -1,7 +1,9 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard } from '@/components/dashboard/StatCard';
-import { ADMIN_SIDEBAR_ITEMS, SCHOOL_NAME, USER_ROLES } from '@/constants';
-import { DashboardService } from '@/services';
+import { ADMIN_SIDEBAR_ITEMS, SCHOOL_NAME } from '@/constants';
 import {
   Users,
   GraduationCap,
@@ -12,47 +14,103 @@ import {
   Bell,
   Calendar,
   LayoutDashboard,
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  DollarSign,
+  Receipt,
+  UserPlus,
+  Megaphone,
 } from 'lucide-react';
 import { formatNumber } from '@/utils/number';
+import { formatDate, toArabicNumerals } from '@/utils/date';
 
-export const metadata = {
-  title: `لوحة التحكم - ${SCHOOL_NAME}`,
-  description: 'لوحة تحكم الإدارة',
-};
-
-async function getDashboardStats() {
-  try {
-    // Temporarily return default stats until repositories are fully migrated
-    return {
-      totalStudents: 0,
-      totalTeachers: 0,
-      totalClasses: 0,
-      attendanceRate: 0,
-      pendingPayments: 0,
-      newComplaints: 0,
-    };
-    
-    // Original code - commented out until repositories are migrated
-    // return await DashboardService.getDashboardStats();
-  } catch {
-    return {
-      totalStudents: 0,
-      totalTeachers: 0,
-      totalClasses: 0,
-      attendanceRate: 0,
-      pendingPayments: 0,
-      newComplaints: 0,
-    };
-  }
+interface DashboardData {
+  totalStudents: number;
+  totalTeachers: number;
+  totalClasses: number;
+  todayPresent: number;
+  todayAbsent: number;
+  newComplaints: number;
+  totalFees?: number;
+  totalPaid?: number;
+  totalRemaining?: number;
+  latestAnnouncement?: any;
+  latestPayment?: any;
+  latestAttendanceSession?: any;
 }
 
-export default async function AdminDashboardPage() {
-  const stats = await getDashboardStats();
+export default function AdminDashboardPage() {
+  const [stats, setStats] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isMainAdmin, setIsMainAdmin] = useState(false);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        // Get token from localStorage
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          setLoading(false);
+          return;
+        }
+
+        // Get user data from auth endpoint
+        const authResponse = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        let mainAdmin = false;
+        if (authResponse.ok) {
+          const authData = await authResponse.json();
+          mainAdmin = authData.user?.is_main_admin || false;
+          setIsMainAdmin(mainAdmin);
+        }
+
+        // Get dashboard stats
+        const response = await fetch('/api/admin/dashboard', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setStats(data);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchStats();
+  }, []);
+
+  if (loading || !stats) {
+    return (
+      <DashboardLayout
+        sidebarItems={ADMIN_SIDEBAR_ITEMS}
+        userRole="admin"
+      >
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg text-gray-500">جاري تحميل الإحصائيات...</div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const totalAttendance = stats.todayPresent + stats.todayAbsent;
+  const attendanceRate = totalAttendance > 0
+    ? Math.round((stats.todayPresent / totalAttendance) * 100)
+    : 0;
 
   return (
     <DashboardLayout
       sidebarItems={ADMIN_SIDEBAR_ITEMS}
-      userRole={USER_ROLES.ADMIN}
+      userRole="admin"
     >
       {/* Page Title */}
       <div className="mb-8">
@@ -63,7 +121,7 @@ export default async function AdminDashboardPage() {
         <p className="text-gray-500 mt-1">نظرة عامة على إحصائيات المدرسة</p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - All Admins */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
         <StatCard
           title="إجمالي الطلاب"
@@ -84,20 +142,18 @@ export default async function AdminDashboardPage() {
           description="الصفوف الدراسية"
         />
         <StatCard
-          title="نسبة الحضور اليوم"
-          value={`${formatNumber(stats.attendanceRate)}%`}
-          icon={<ClipboardCheck className="h-5 w-5" />}
-          description="حضور اليوم"
+          title="الحضور اليوم"
+          value={formatNumber(stats.todayPresent)}
+          icon={<TrendingUp className="h-5 w-5 text-green-600" />}
+          description={`نسبة الحضور: ${toArabicNumerals(attendanceRate)}٪`}
           trend="up"
-          trendValue={`${formatNumber(2)}%`}
         />
         <StatCard
-          title="الأقساط المعلقة"
-          value={formatNumber(stats.pendingPayments)}
-          icon={<CreditCard className="h-5 w-5" />}
-          description="قسط غير مدفوع"
+          title="الغياب اليوم"
+          value={formatNumber(stats.todayAbsent)}
+          icon={<TrendingDown className="h-5 w-5 text-red-600" />}
+          description="عدد الطلاب الغائبين"
           trend="down"
-          trendValue={`${formatNumber(5)}%`}
         />
         <StatCard
           title="شكاوى جديدة"
@@ -107,69 +163,110 @@ export default async function AdminDashboardPage() {
         />
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Announcements Placeholder */}
+      {/* Financial Stats - Main Admin Only */}
+      {isMainAdmin && stats.totalFees !== undefined && (
+        <>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">الإحصائيات المالية</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            <StatCard
+              title="إجمالي الأقساط"
+              value={formatNumber(stats.totalFees)}
+              icon={<Wallet className="h-5 w-5 text-blue-600" />}
+              description="المبلغ الإجمالي المستحق"
+            />
+            <StatCard
+              title="إجمالي المدفوع"
+              value={formatNumber(stats.totalPaid || 0)}
+              icon={<DollarSign className="h-5 w-5 text-green-600" />}
+              description="المبلغ المحصل"
+              trend="up"
+            />
+            <StatCard
+              title="إجمالي المتبقي"
+              value={formatNumber(stats.totalRemaining || 0)}
+              icon={<Receipt className="h-5 w-5 text-orange-600" />}
+              description="المبلغ المتبقي للتحصيل"
+              trend="down"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Recent Activities */}
+      <h2 className="text-xl font-bold text-gray-900 mb-4">آخر النشاطات</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Latest Announcement */}
         <div className="bg-white rounded-xl shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">آخر الإعلانات</h2>
-            <Bell className="h-5 w-5 text-gray-400" />
+            <h3 className="text-lg font-semibold text-gray-900">آخر إعلان</h3>
+            <Megaphone className="h-5 w-5 text-gray-400" />
           </div>
-          <div className="space-y-3">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded">عاجل</span>
-                <span className="text-sm text-gray-500">اليوم</span>
-              </div>
-              <p className="font-medium text-gray-900">تأجيل الامتحانات النصفية</p>
-              <p className="text-sm text-gray-500 mt-1">تم تأجيل الامتحانات النصفية إلى الأسبوع القادم</p>
-            </div>
+          {stats.latestAnnouncement ? (
             <div className="p-4 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">إعلان</span>
-                <span className="text-sm text-gray-500">أمس</span>
+                <span className="text-sm text-gray-500">
+                  {formatDate(stats.latestAnnouncement.created_at)}
+                </span>
               </div>
-              <p className="font-medium text-gray-900">اجتماع أولياء الأمور</p>
-              <p className="text-sm text-gray-500 mt-1">اجتماع أولياء الأمور يوم السبت القادم الساعة 5 مساءً</p>
+              <p className="font-medium text-gray-900 line-clamp-1">{stats.latestAnnouncement.title}</p>
+              <p className="text-sm text-gray-500 mt-1 line-clamp-2">{stats.latestAnnouncement.content}</p>
             </div>
-          </div>
+          ) : (
+            <p className="text-gray-500 text-center py-4">لا توجد إعلانات</p>
+          )}
         </div>
 
-        {/* Weekly Schedule Preview */}
+        {/* Latest Payment */}
+        {isMainAdmin && (
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">آخر دفعة</h3>
+              <CreditCard className="h-5 w-5 text-gray-400" />
+            </div>
+            {stats.latestPayment ? (
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-500">
+                    {formatDate(stats.latestPayment.payment_date || stats.latestPayment.created_at)}
+                  </span>
+                  <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded">
+                    {formatNumber(stats.latestPayment.amount)} ل.س
+                  </span>
+                </div>
+                <p className="font-medium text-gray-900">
+                  {stats.latestPayment.student_name || 'طالب'}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">تم استلام دفعة جديدة</p>
+              </div>
+            ) : (
+              <p className="text-gray-500 text-center py-4">لا توجد دفعات</p>
+            )}
+          </div>
+        )}
+
+        {/* Latest Attendance */}
         <div className="bg-white rounded-xl shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">البرنامج الأسبوعي</h2>
-            <Calendar className="h-5 w-5 text-gray-400" />
+            <h3 className="text-lg font-semibold text-gray-900">آخر تسجيل حضور</h3>
+            <ClipboardCheck className="h-5 w-5 text-gray-400" />
           </div>
-          <div className="space-y-3">
-            <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-              <div className="w-12 h-12 rounded-lg bg-brand-primary-blue/10 flex items-center justify-center text-brand-primary-blue font-bold">
-                الأحد
+          {stats.latestAttendanceSession ? (
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded">حضور</span>
+                <span className="text-sm text-gray-500">
+                  {formatDate(stats.latestAttendanceSession.date)}
+                </span>
               </div>
-              <div>
-                <p className="font-medium text-gray-900">الفصل الأول - الصف الرابع</p>
-                <p className="text-sm text-gray-500">الرياضيات - الأستاذ أحمد</p>
-              </div>
+              <p className="font-medium text-gray-900">تم تسجيل الحضور اليومي</p>
+              <p className="text-sm text-gray-500 mt-1">
+                الحالة: {stats.latestAttendanceSession.status === 'completed' ? 'مكتمل' : 'نشط'}
+              </p>
             </div>
-            <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-              <div className="w-12 h-12 rounded-lg bg-brand-primary-blue/10 flex items-center justify-center text-brand-primary-blue font-bold">
-                الأحد
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">الفصل الثاني - الصف الخامس</p>
-                <p className="text-sm text-gray-500">اللغة العربية - الأستاذة فاطمة</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-              <div className="w-12 h-12 rounded-lg bg-brand-primary-blue/10 flex items-center justify-center text-brand-primary-blue font-bold">
-                الاثنين
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">الفصل الأول - الصف السادس</p>
-                <p className="text-sm text-gray-500">العلوم - الأستاذ خالد</p>
-              </div>
-            </div>
-          </div>
+          ) : (
+            <p className="text-gray-500 text-center py-4">لا توجد جلسات حضور</p>
+          )}
         </div>
       </div>
     </DashboardLayout>

@@ -48,12 +48,12 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const deleted = await ClassService.deleteClass(id);
+    const result = await ClassService.deleteClass(id);
 
-    if (!deleted) {
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'الصف غير موجود' },
-        { status: 404 }
+        { error: result.error || 'الصف غير موجود' },
+        { status: result.error ? 400 : 404 }
       );
     }
 
