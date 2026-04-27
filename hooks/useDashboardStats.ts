@@ -7,8 +7,8 @@ export function useDashboardStats() {
     totalStudents: 0,
     totalTeachers: 0,
     totalClasses: 0,
-    attendanceRate: 0,
-    pendingPayments: 0,
+    todayPresent: 0,
+    todayAbsent: 0,
     newComplaints: 0,
   });
   const [loading, setLoading] = useState(true);
