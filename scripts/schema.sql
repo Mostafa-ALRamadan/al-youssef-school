@@ -274,6 +274,7 @@ CREATE TABLE IF NOT EXISTS student_evaluations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     student_id UUID NOT NULL REFERENCES students(id),
     teacher_id UUID NOT NULL REFERENCES teachers(id),
+    subject_id UUID REFERENCES subjects(id),
     behavior_rating INTEGER CHECK (behavior_rating >= 1 AND behavior_rating <= 5),
     participation_rating INTEGER CHECK (participation_rating >= 1 AND participation_rating <= 5),
     homework_rating INTEGER CHECK (homework_rating >= 1 AND homework_rating <= 5),
@@ -284,6 +285,7 @@ CREATE TABLE IF NOT EXISTS student_evaluations (
 
 CREATE INDEX IF NOT EXISTS idx_evaluations_student_id ON student_evaluations(student_id);
 CREATE INDEX IF NOT EXISTS idx_evaluations_teacher_id ON student_evaluations(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_evaluations_subject_id ON student_evaluations(subject_id);
 CREATE INDEX IF NOT EXISTS idx_evaluations_semester_id ON student_evaluations(semester_id);
 
 -- ============================================================================
@@ -468,12 +470,14 @@ CREATE TABLE IF NOT EXISTS notifications (
     message TEXT NOT NULL,
     type TEXT NOT NULL,
     is_read BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_updated_at ON notifications(updated_at);
 
 CREATE TRIGGER update_notifications_updated_at BEFORE UPDATE ON notifications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

@@ -80,11 +80,16 @@ export async function PUT(
       );
     }
 
-    // Delete old image if new image is being uploaded
-    if (image_url !== undefined && image_url !== existingNews.image_url && existingNews.image_url) {
+    // Delete old image if being replaced by new image or video (or explicitly removed)
+    const oldImageUrl = existingNews.image_url;
+    const hasOldImage = !!oldImageUrl;
+    const imageRemoved = hasOldImage && (image_url === null || image_url === '');
+    const imageReplaced = hasOldImage && image_url && image_url !== oldImageUrl;
+    
+    if (imageRemoved || imageReplaced) {
       try {
         const uploadBasePath = process.env.UPLOAD_PATH || join(process.cwd(), 'public', 'uploads');
-        const oldImagePath = join(uploadBasePath, existingNews.image_url.replace('/uploads/', ''));
+        const oldImagePath = join(uploadBasePath, oldImageUrl!.replace('/uploads/', ''));
         if (existsSync(oldImagePath)) {
           await unlink(oldImagePath);
         }

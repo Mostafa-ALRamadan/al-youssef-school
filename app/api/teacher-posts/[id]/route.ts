@@ -93,8 +93,8 @@ export async function PUT(
       [title || null, content, image_url || null, video_url || null, class_id, subject_id, id]
     );
     
-    // Delete old image file if it exists and is different from new one
-    if (oldImageUrl && oldImageUrl !== image_url && image_url) {
+    // Delete old image file if it exists and is being replaced (with new image or video)
+    if (oldImageUrl && oldImageUrl !== image_url) {
       try {
         // Extract filename from URL (e.g., /uploads/posts/image.jpg)
         const filename = oldImageUrl.split('/').pop();

@@ -55,10 +55,12 @@ export default function AdminEvaluationsPage() {
   const [loading, setLoading] = useState(true);
   const [classes, setClasses] = useState<Class[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
   const [semesters, setSemesters] = useState<{ id: string; name: string; academic_year_name: string }[]>([]);
   const [evaluations, setEvaluations] = useState<StudentEvaluation[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedSemester, setSelectedSemester] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   // Track if initial semester load is complete to prevent premature evaluation loading
@@ -67,6 +69,7 @@ export default function AdminEvaluationsPage() {
   useEffect(() => {
     loadClasses();
     loadTeachers();
+    loadSubjects();
     loadSemesters();
   }, []);
 
@@ -96,7 +99,7 @@ export default function AdminEvaluationsPage() {
     if (isSemesterLoaded) {
       loadEvaluations();
     }
-  }, [selectedClass, selectedTeacher, selectedSemester, isSemesterLoaded]);
+  }, [selectedClass, selectedTeacher, selectedSubject, selectedSemester, isSemesterLoaded]);
 
   const loadClasses = async () => {
     try {
@@ -122,12 +125,25 @@ export default function AdminEvaluationsPage() {
     }
   };
 
+  const loadSubjects = async () => {
+    try {
+      const response = await fetch('/api/subjects');
+      if (response.ok) {
+        const data = await response.json();
+        setSubjects(data.subjects || []);
+      }
+    } catch (error) {
+      console.error('Error loading subjects:', error);
+    }
+  };
+
   const loadEvaluations = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
       if (selectedClass && selectedClass !== '__all__') params.append('class_id', selectedClass);
       if (selectedTeacher && selectedTeacher !== '__all__') params.append('teacher_id', selectedTeacher);
+      if (selectedSubject && selectedSubject !== '__all__') params.append('subject_id', selectedSubject);
       if (selectedSemester) params.append('semester_id', selectedSemester);
 
       const response = await fetch(`/api/student-evaluations?${params.toString()}`);
@@ -271,6 +287,22 @@ export default function AdminEvaluationsPage() {
                 </Select>
               </div>
               <div>
+                <label className="block text-sm font-medium mb-2">المادة</label>
+                <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="جميع المواد" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">جميع المواد</SelectItem>
+                    {subjects.map((subject) => (
+                      <SelectItem key={subject.id} value={subject.id}>
+                        {subject.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <label className="block text-sm font-medium mb-2">المعلم</label>
                 <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
                   <SelectTrigger>
@@ -321,6 +353,7 @@ export default function AdminEvaluationsPage() {
                     <TableHead className="text-center">الطالب</TableHead>
                     <TableHead className="text-center">الصف</TableHead>
                     <TableHead className="text-center">المعلم</TableHead>
+                    <TableHead className="text-center">المادة</TableHead>
                     <TableHead className="text-center">السلوك</TableHead>
                     <TableHead className="text-center">المشاركة</TableHead>
                     <TableHead className="text-center">الواجبات</TableHead>
@@ -340,6 +373,9 @@ export default function AdminEvaluationsPage() {
                       </TableCell>
                       <TableCell className="text-center">
                         {evaluation.teacher_name}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {(evaluation as any).subject_name || '-'}
                       </TableCell>
                       <TableCell className="text-center">
                         <span className={`px-2 py-1 rounded-full text-sm ${RATING_COLORS[evaluation.behavior_rating]}`}>

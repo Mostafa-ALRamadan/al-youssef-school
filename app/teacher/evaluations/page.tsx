@@ -31,6 +31,11 @@ interface Class {
   name: string;
 }
 
+interface Subject {
+  id: string;
+  name: string;
+}
+
 const RATING_LABELS: Record<number, string> = {
   1: 'ضعيف',
   2: 'وسط',
@@ -59,14 +64,17 @@ export default function TeacherEvaluationsPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [classes, setClasses] = useState<Class[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [evaluations, setEvaluations] = useState<StudentEvaluation[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('');
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedStudent, setSelectedStudent] = useState<string>('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<StudentEvaluation | null>(null);
   const [formData, setFormData] = useState({
+    subject_id: '',
     behavior_rating: 3,
     participation_rating: 3,
     homework_rating: 3,
@@ -81,6 +89,7 @@ export default function TeacherEvaluationsPage() {
 
   useEffect(() => {
     if (selectedClass) {
+      loadSubjects();
       loadStudents();
       loadEvaluations();
     }
@@ -98,6 +107,21 @@ export default function TeacherEvaluationsPage() {
       }
     } catch (error) {
       console.error('Error loading classes:', error);
+    }
+  };
+
+  const loadSubjects = async () => {
+    try {
+      const response = await fetch(`/api/teacher/classes/${selectedClass}/subjects`, {
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSubjects(data.subjects || []);
+      }
+    } catch (error) {
+      console.error('Error loading subjects:', error);
     }
   };
 
@@ -223,10 +247,25 @@ export default function TeacherEvaluationsPage() {
     setIsDialogOpen(true);
   };
 
+  const openAddDialogWithSubject = (studentId: string, subjectId: string) => {
+    setSelectedStudent(studentId);
+    setIsEditMode(false);
+    setSelectedEvaluation(null);
+    setFormData({
+      subject_id: subjectId,
+      behavior_rating: 3,
+      participation_rating: 3,
+      homework_rating: 3,
+      notes: '',
+    });
+    setIsDialogOpen(true);
+  };
+
   const openEditDialog = (evaluation: StudentEvaluation) => {
     setSelectedEvaluation(evaluation);
     setIsEditMode(true);
     setFormData({
+      subject_id: (evaluation as any).subject_id || '',
       behavior_rating: evaluation.behavior_rating,
       participation_rating: evaluation.participation_rating,
       homework_rating: evaluation.homework_rating,
@@ -237,11 +276,13 @@ export default function TeacherEvaluationsPage() {
 
   const resetForm = () => {
     setFormData({
+      subject_id: '',
       behavior_rating: 3,
       participation_rating: 3,
       homework_rating: 3,
       notes: '',
     });
+    setSelectedSubject('');
   };
 
   const getExistingEvaluation = (studentId: string) => {
@@ -295,6 +336,7 @@ export default function TeacherEvaluationsPage() {
                   <TableHeader>
                     <TableRow className="bg-gray-50">
                       <TableHead className="text-center">الطالب</TableHead>
+                      <TableHead className="text-center">المادة</TableHead>
                       <TableHead className="text-center">السلوك</TableHead>
                       <TableHead className="text-center">المشاركة</TableHead>
                       <TableHead className="text-center">الواجبات</TableHead>
@@ -305,45 +347,46 @@ export default function TeacherEvaluationsPage() {
                   </TableHeader>
                   <TableBody>
                     {students.map((student) => {
-                      const evaluation = getExistingEvaluation(student.id);
-                      return (
-                        <TableRow key={student.id}>
-                          <TableCell className="text-center font-medium">{student.name}</TableCell>
-                          <TableCell className="text-center">
-                            {evaluation ? (
+                      // Get evaluations for this student grouped by subject
+                      const studentEvaluations = evaluations.filter(e => e.student_id === student.id);
+                      
+                      // Show each subject evaluation as a separate row
+                      const rows: React.ReactNode[] = [];
+                      
+                      // Add existing evaluations
+                      studentEvaluations.forEach((evaluation, index) => {
+                        rows.push(
+                          <TableRow key={`${student.id}-${(evaluation as any).subject_id || 'general'}-${index}`}>
+                            <TableCell className="text-center font-medium">
+                              {index === 0 ? student.name : ''}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-sm text-gray-600">
+                                {(evaluation as any).subject_name || '-'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
                               <span className={`px-2 py-1 rounded-full text-sm ${RATING_BADGE_COLORS[evaluation.behavior_rating]}`}>
                                 {RATING_LABELS[evaluation.behavior_rating]}
                               </span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {evaluation ? (
+                            </TableCell>
+                            <TableCell className="text-center">
                               <span className={`px-2 py-1 rounded-full text-sm ${RATING_BADGE_COLORS[evaluation.participation_rating]}`}>
                                 {RATING_LABELS[evaluation.participation_rating]}
                               </span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {evaluation ? (
+                            </TableCell>
+                            <TableCell className="text-center">
                               <span className={`px-2 py-1 rounded-full text-sm ${RATING_BADGE_COLORS[evaluation.homework_rating]}`}>
                                 {RATING_LABELS[evaluation.homework_rating]}
                               </span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center max-w-xs truncate">
-                            {evaluation?.notes || '-'}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {evaluation ? formatDate(evaluation.created_at) : '-'}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {evaluation ? (
+                            </TableCell>
+                            <TableCell className="text-center max-w-xs truncate">
+                              {evaluation.notes || '-'}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {formatDate(evaluation.created_at)}
+                            </TableCell>
+                            <TableCell className="text-center">
                               <div className="flex items-center justify-center gap-2">
                                 <Button
                                   variant="ghost"
@@ -362,19 +405,46 @@ export default function TeacherEvaluationsPage() {
                                   <Trash2 className="h-4 w-4 text-red-600" />
                                 </Button>
                               </div>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => openAddDialog(student.id)}
-                                className="bg-brand-primary-blue hover:bg-brand-dark-blue"
-                              >
-                                <Plus className="h-4 w-4 ml-1" />
-                                تقييم
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+                      
+                      // Add a row for subjects not yet evaluated
+                      const evaluatedSubjects = new Set(studentEvaluations.map(e => (e as any).subject_id));
+                      const unevaluatedSubjects = subjects.filter(s => !evaluatedSubjects.has(s.id));
+                      
+                      if (unevaluatedSubjects.length > 0) {
+                        unevaluatedSubjects.forEach((subject, index) => {
+                          rows.push(
+                            <TableRow key={`${student.id}-${subject.id}-new-${index}`}>
+                              <TableCell className="text-center font-medium">
+                                {studentEvaluations.length === 0 && index === 0 ? student.name : ''}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <span className="text-sm text-gray-600">{subject.name}</span>
+                              </TableCell>
+                              <TableCell className="text-center"><span className="text-gray-400">-</span></TableCell>
+                              <TableCell className="text-center"><span className="text-gray-400">-</span></TableCell>
+                              <TableCell className="text-center"><span className="text-gray-400">-</span></TableCell>
+                              <TableCell className="text-center">-</TableCell>
+                              <TableCell className="text-center">-</TableCell>
+                              <TableCell className="text-center">
+                                <Button
+                                  size="sm"
+                                  onClick={() => openAddDialogWithSubject(student.id, subject.id)}
+                                  className="bg-brand-primary-blue hover:bg-brand-dark-blue"
+                                >
+                                  <Plus className="h-4 w-4 ml-1" />
+                                  تقييم
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        });
+                      }
+                      
+                      return rows;
                     })}
                   </TableBody>
                 </Table>
@@ -392,6 +462,34 @@ export default function TeacherEvaluationsPage() {
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-6 py-4">
+              {/* Subject Display */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">المادة</label>
+                <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+                  {isEditMode ? (
+                    <Select 
+                      value={formData.subject_id} 
+                      onValueChange={(value) => setFormData({ ...formData, subject_id: value })}
+                    >
+                      <SelectTrigger className="w-full bg-white">
+                        <SelectValue placeholder="اختر المادة" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subjects.map((subject) => (
+                          <SelectItem key={subject.id} value={subject.id}>
+                            {subject.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="text-gray-700">
+                      {subjects.find(s => s.id === formData.subject_id)?.name || 'غير محدد'}
+                    </span>
+                  )}
+                </div>
+              </div>
+
               {/* Behavior Rating */}
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-2">السلوك</label>

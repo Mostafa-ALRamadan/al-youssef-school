@@ -10,13 +10,17 @@ export async function GET(request: NextRequest) {
     const teacherId = searchParams.get('teacher_id');
     const semesterId = searchParams.get('semester_id');
 
+    const subjectId = searchParams.get('subject_id');
+
     // Build dynamic query with JOINs
     let sql = `
-      SELECT se.*, s.name as student_name, s.class_id, c.name as class_name, t.name as teacher_name
+      SELECT se.*, s.name as student_name, s.class_id, c.name as class_name, 
+             t.name as teacher_name, sub.name as subject_name
       FROM student_evaluations se
       LEFT JOIN students s ON se.student_id = s.id
       LEFT JOIN classes c ON s.class_id = c.id
       LEFT JOIN teachers t ON se.teacher_id = t.id
+      LEFT JOIN subjects sub ON se.subject_id = sub.id
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -39,6 +43,11 @@ export async function GET(request: NextRequest) {
     if (semesterId) {
       params.push(semesterId);
       sql += ` AND se.semester_id = $${params.length}`;
+    }
+
+    if (subjectId) {
+      params.push(subjectId);
+      sql += ` AND se.subject_id = $${params.length}`;
     }
 
     sql += ' ORDER BY se.created_at DESC';
@@ -71,12 +80,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { student_id, behavior_rating, participation_rating, homework_rating, notes } = body;
+    const { student_id, subject_id, behavior_rating, participation_rating, homework_rating, notes } = body;
 
     // Validate required fields
     if (!student_id) {
       return NextResponse.json(
         { error: 'student_id is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!subject_id) {
+      return NextResponse.json(
+        { error: 'subject_id is required' },
         { status: 400 }
       );
     }
@@ -99,10 +115,10 @@ export async function POST(request: NextRequest) {
     const activeSemester = semesterResult.rows[0];
 
     const result = await query(
-      `INSERT INTO student_evaluations (student_id, teacher_id, behavior_rating, participation_rating, homework_rating, notes, semester_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO student_evaluations (student_id, teacher_id, subject_id, behavior_rating, participation_rating, homework_rating, notes, semester_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [student_id, teacher.id, behavior_rating, participation_rating, homework_rating, notes, activeSemester?.id]
+      [student_id, teacher.id, subject_id, behavior_rating, participation_rating, homework_rating, notes, activeSemester?.id]
     );
 
     return NextResponse.json({ evaluation: result.rows[0] }, { status: 201 });
@@ -116,7 +132,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, behavior_rating, participation_rating, homework_rating, notes } = body;
+    const { id, subject_id, behavior_rating, participation_rating, homework_rating, notes } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
@@ -135,10 +151,10 @@ export async function PUT(request: NextRequest) {
 
     const result = await query(
       `UPDATE student_evaluations
-       SET behavior_rating = $1, participation_rating = $2, homework_rating = $3, notes = $4
-       WHERE id = $5
+       SET subject_id = $1, behavior_rating = $2, participation_rating = $3, homework_rating = $4, notes = $5
+       WHERE id = $6
        RETURNING *`,
-      [behavior_rating, participation_rating, homework_rating, notes, id]
+      [subject_id || null, behavior_rating, participation_rating, homework_rating, notes, id]
     );
 
     return NextResponse.json({ evaluation: result.rows[0] });

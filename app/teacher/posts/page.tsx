@@ -497,7 +497,7 @@ export default function TeacherPostsPage() {
                     required
                   >
                     <option value="">اختر الصف</option>
-                    {assignments.map((assignment) => (
+                    {Array.from(new Map(assignments.map(a => [a.class_id, a])).values()).map((assignment) => (
                       <option key={assignment.class_id} value={assignment.class_id}>
                         {assignment.class_name}
                       </option>

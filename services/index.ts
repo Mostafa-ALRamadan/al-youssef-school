@@ -1067,3 +1067,6 @@ export class NewsService {
     return await NewsRepository.togglePublish(id);
   }
 }
+
+// Export Parent Mobile Service
+export { ParentMobileService } from './ParentMobileService';
