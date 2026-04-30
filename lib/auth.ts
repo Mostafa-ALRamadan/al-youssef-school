@@ -41,35 +41,6 @@ export function getCurrentUser(request: NextRequest): AuthUser | null {
 }
 
 /**
- * Check if user has required role
- */
-export function hasRole(user: AuthUser | null, role: string): boolean {
-  if (!user) return false;
-  return user.role === role;
-}
-
-/**
- * Check if user is admin
- */
-export function isAdmin(user: AuthUser | null): boolean {
-  return hasRole(user, 'admin');
-}
-
-/**
- * Check if user is teacher
- */
-export function isTeacher(user: AuthUser | null): boolean {
-  return hasRole(user, 'teacher');
-}
-
-/**
- * Check if user is parent
- */
-export function isParent(user: AuthUser | null): boolean {
-  return hasRole(user, 'parent');
-}
-
-/**
  * Create new auth user with hashed password
  */
 export async function createAuthUser(
@@ -133,15 +104,4 @@ export async function deleteAuthUser(userId: string): Promise<{ error: Error | n
   } catch (error: any) {
     return { error };
   }
-}
-
-/**
- * Get user from token with proper error handling
- */
-export async function getUserFromToken(token: string): Promise<{ user: AuthUser | null; error: Error | null }> {
-  const user = verifyToken(token);
-  if (!user) {
-    return { user: null, error: new Error('Invalid token') };
-  }
-  return { user, error: null };
 }

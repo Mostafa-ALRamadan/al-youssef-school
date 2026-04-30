@@ -105,6 +105,11 @@ export default function StarsOfTheYearPage() {
       }
     } catch (error) {
       console.error('Error loading saved stars:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل نجوم السنة المحفوظة',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -137,6 +142,11 @@ export default function StarsOfTheYearPage() {
       }
     } catch (error) {
       console.error('Error loading filters:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل البيانات',
+        variant: 'destructive',
+      });
     }
   };
 

@@ -14,7 +14,7 @@ export default function LoginPage() {
     const checkExistingSession = async () => {
       try {
         const token = getToken();
-        
+         
         if (token) {
           // Verify token and get user role
           const response = await fetch('/api/auth/me', {

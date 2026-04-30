@@ -544,6 +544,20 @@ export class AttendanceRepository {
     }
   }
 
+  // Find session by schedule_id and date (without creating)
+  static async findSession(scheduleId: string, date: string): Promise<AttendanceSession | null> {
+    try {
+      const result = await query(
+        'SELECT * FROM attendance_sessions WHERE schedule_id = $1 AND date = $2',
+        [scheduleId, date]
+      );
+      return result.rows[0] as AttendanceSession || null;
+    } catch (error) {
+      console.error('Error in AttendanceRepository.findSession:', error);
+      return null;
+    }
+  }
+
   // Find session by id
   static async findSessionById(sessionId: string): Promise<AttendanceSession | null> {
     try {

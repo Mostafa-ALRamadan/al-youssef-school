@@ -21,10 +21,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Key, Users, Search } from 'lucide-react';
+import { Plus, Pencil, Key, Users, Search, Trash2 } from 'lucide-react';
 
 interface User {
   id: string;
@@ -49,6 +59,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 export default function AdminUsersPage() {
+  const { toast } = useToast();
   const { userInfo: currentUser, refreshUser } = useUser();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +70,7 @@ export default function AdminUsersPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   
   // Form states
@@ -105,9 +117,24 @@ export default function AdminUsersPage() {
         setIsAddDialogOpen(false);
         setFormData({ email: '', password: '', role: 'admin', full_name: '', phone: '' });
         loadUsers();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم إضافة المستخدم',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في إضافة المستخدم',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error adding user:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -137,9 +164,24 @@ export default function AdminUsersPage() {
         if (selectedUser?.id === currentUser?.id) {
           await refreshUser();
         }
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم تحديث بيانات المستخدم',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في تحديث المستخدم',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error updating user:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -161,9 +203,24 @@ export default function AdminUsersPage() {
         setIsPasswordDialogOpen(false);
         setNewPassword('');
         setSelectedUser(null);
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم إعادة تعيين كلمة المرور',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في إعادة تعيين كلمة المرور',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error resetting password:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -199,6 +256,65 @@ export default function AdminUsersPage() {
     setSelectedUser(user);
     setNewPassword('');
     setIsPasswordDialogOpen(true);
+  };
+
+  const openDeleteDialog = (user: User) => {
+    setSelectedUser(user);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedUser) return;
+
+    try {
+      const response = await fetch(`/api/admin/users/${selectedUser.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        setIsDeleteDialogOpen(false);
+        setSelectedUser(null);
+        loadUsers(); // Refresh the list
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حذف المستخدم',
+        });
+      } else {
+        const error = await response.json();
+        console.error('Delete error:', error);
+        toast({
+          title: 'خطأ',
+          description: error.message || 'فشل في حذف المستخدم',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Check if current user can delete target user (sub-admins only)
+  const canDeleteUser = (targetUser: User): boolean => {
+    if (!currentUser) return false;
+    
+    // Only allow deletion of sub-admins (role = 'admin' but not main admin)
+    if (targetUser.role !== 'admin') return false;
+    if (targetUser.is_main_admin) return false;
+    
+    // Cannot delete self
+    if (currentUser.id === targetUser.id) return false;
+    
+    // Main admin can delete any sub-admin
+    if (currentUser.is_main_admin) return true;
+    
+    // Normal admin cannot delete other admins
+    return false;
   };
 
   const filteredUsers = users.filter((user) => {
@@ -355,6 +471,17 @@ export default function AdminUsersPage() {
                             </Button>
                           </>
                         )}
+                        {canDeleteUser(user) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openDeleteDialog(user)}
+                            title="حذف"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -469,6 +596,29 @@ export default function AdminUsersPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+            <AlertDialogDescription dir="rtl" className="text-right">
+              هل أنت متأكد من حذف المستخدم &quot;{selectedUser?.full_name || selectedUser?.email}&quot;؟
+              <br />
+              لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

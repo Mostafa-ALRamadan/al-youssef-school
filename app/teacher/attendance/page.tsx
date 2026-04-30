@@ -145,7 +145,7 @@ export default function TeacherAttendancePage() {
   };
 
   const handleSave = async () => {
-    if (!sessionId) return;
+    if (!selectedLesson) return;
 
     try {
       setSaving(true);
@@ -161,7 +161,8 @@ export default function TeacherAttendancePage() {
           ...getAuthHeaders(),
         },
         body: JSON.stringify({
-          session_id: sessionId,
+          schedule_id: selectedLesson,
+          date: today,
           records,
         }),
       });

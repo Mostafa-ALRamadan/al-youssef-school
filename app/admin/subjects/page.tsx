@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ADMIN_SIDEBAR_ITEMS } from '@/constants';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 import {
   Table,
   TableBody,
@@ -40,6 +41,7 @@ interface Subject {
 }
 
 export default function SubjectsPage() {
+  const { toast } = useToast();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -79,9 +81,24 @@ export default function SubjectsPage() {
         setIsAddDialogOpen(false);
         setFormData({ name: '' });
         fetchSubjects();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم إضافة المادة',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في إضافة المادة',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error adding subject:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -101,9 +118,24 @@ export default function SubjectsPage() {
         setSelectedSubject(null);
         setFormData({ name: '' });
         fetchSubjects();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم تحديث المادة',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في تحديث المادة',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error updating subject:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -119,9 +151,24 @@ export default function SubjectsPage() {
         setIsDeleteDialogOpen(false);
         setSelectedSubject(null);
         fetchSubjects();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حذف المادة',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في حذف المادة',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error deleting subject:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -262,7 +309,7 @@ export default function SubjectsPage() {
 
         {/* Delete Alert Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent dir="rtl">
             <AlertDialogHeader>
               <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
               <AlertDialogDescription dir="rtl" className="text-right">
@@ -271,13 +318,11 @@ export default function SubjectsPage() {
                 لا يمكن التراجع عن هذا الإجراء.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
-                إلغاء
-              </AlertDialogCancel>
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDelete}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 حذف
               </AlertDialogAction>

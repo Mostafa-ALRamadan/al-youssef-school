@@ -471,10 +471,10 @@ export class AttendanceService {
     const dayOfWeek = new Date(date).getDay();
     const todaySchedules = allSchedules.filter(schedule => schedule.day_of_week === dayOfWeek);
 
-    // For each schedule, get or create attendance session
+    // For each schedule, only FIND existing sessions (don't create)
     const lessonsWithSessions = await Promise.all(
       todaySchedules.map(async (schedule) => {
-        const session = await AttendanceRepository.findOrCreateSession(schedule.id, date);
+        const session = await AttendanceRepository.findSession(schedule.id, date);
         // Check if there are actual attendance records for this session
         const records = session ? await AttendanceRepository.findRecordsBySessionId(session.id) : [];
         return {
@@ -490,11 +490,8 @@ export class AttendanceService {
 
   // Get students for attendance marking
   static async getStudentsForAttendance(scheduleId: string, date: string) {
-    // Get or create session
-    const session = await AttendanceRepository.findOrCreateSession(scheduleId, date);
-    if (!session) {
-      return { session: null, students: [], records: [] };
-    }
+    // Find existing session only (don't create)
+    const session = await AttendanceRepository.findSession(scheduleId, date);
 
     // Get schedule to find class_id
     const schedule = await WeeklyScheduleRepository.findById(scheduleId);
@@ -505,8 +502,8 @@ export class AttendanceService {
     // Get students from the class
     const students = await StudentRepository.findByClassId(schedule.class_id);
 
-    // Get existing records
-    const records = await AttendanceRepository.findRecordsBySessionId(session.id);
+    // Get existing records if session exists
+    const records = session ? await AttendanceRepository.findRecordsBySessionId(session.id) : [];
 
     return { session, students, records };
   }
@@ -836,9 +833,6 @@ export class TimeSlotService {
     return await TimeSlotRepository.delete(id);
   }
 }
-
-// Export AuthService from separate file
-export { AuthService } from './auth';
 
 // New Grades System Services
 export class ExamService {

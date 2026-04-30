@@ -18,8 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -27,8 +25,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Eye, Plus, Wallet, CreditCard, TrendingDown, Users } from 'lucide-react';
+import { Search, Eye, Plus, Wallet, CreditCard, TrendingDown, Users, X, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { formatNumber } from '@/utils/number';
 import { toArabicNumerals } from '@/utils/date';
@@ -84,12 +94,21 @@ export default function PaymentsPage() {
   const [fees, setFees] = useState<StudentFee[]>([]);
   const [filteredFees, setFilteredFees] = useState<StudentFee[]>([]);
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
+  const [selectedFee, setSelectedFee] = useState<StudentFee | null>(null);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [feeToDelete, setFeeToDelete] = useState<StudentFee | null>(null);
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [students, setStudents] = useState<{ id: string; name: string; class_name?: string }[]>([]);
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [showStudentSuggestions, setShowStudentSuggestions] = useState(false);
   const [academicYears, setAcademicYears] = useState<{ id: string; name: string }[]>([]);
   const [teacherSessions, setTeacherSessions] = useState<{ id: string; name: string; sessionCount: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const [showTeacherSessions, setShowTeacherSessions] = useState(false);
   const [formData, setFormData] = useState({
     student_id: '',
@@ -149,6 +168,22 @@ export default function PaymentsPage() {
     );
     setFilteredFees(filtered);
   }, [searchTerm, fees]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredFees.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedFees = filteredFees.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, itemsPerPage]);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -225,6 +260,8 @@ export default function PaymentsPage() {
         });
         setIsAddDialogOpen(false);
         setFormData({ student_id: '', academic_year_id: '', school_fee: '', transport_fee: '' });
+        setStudentSearchQuery('');
+        setShowStudentSuggestions(false);
         fetchData();
       } else {
         const error = await response.json();
@@ -246,6 +283,41 @@ export default function PaymentsPage() {
 
   const viewDetails = (feeId: string) => {
     router.push(`/admin/payments/${feeId}`);
+  };
+
+  const handleDeleteFee = async () => {
+    if (!feeToDelete) return;
+
+    try {
+      const response = await fetch(`/api/fees/${feeToDelete.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'تم',
+          description: 'تم حذف سجل القسط بنجاح',
+        });
+        setIsDeleteDialogOpen(false);
+        setFeeToDelete(null);
+        fetchData();
+      } else {
+        const error = await response.json();
+        toast({
+          title: 'خطأ',
+          description: error.error || 'فشل في حذف سجل القسط',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting fee:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
+    }
   };
 
   if (loading) {
@@ -285,7 +357,7 @@ export default function PaymentsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatNumber(summary.total_fees)}</div>
-                <p className="text-xs text-muted-foreground">ل.س</p>
+                <p className="text-xs text-muted-foreground">$</p>
               </CardContent>
             </Card>
             <Card>
@@ -295,7 +367,7 @@ export default function PaymentsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">{formatNumber(summary.total_paid)}</div>
-                <p className="text-xs text-muted-foreground">ل.س</p>
+                <p className="text-xs text-muted-foreground">$</p>
               </CardContent>
             </Card>
             <Card>
@@ -305,7 +377,7 @@ export default function PaymentsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600">{formatNumber(summary.total_remaining)}</div>
-                <p className="text-xs text-muted-foreground">ل.س</p>
+                <p className="text-xs text-muted-foreground">$</p>
               </CardContent>
             </Card>
           </div>
@@ -339,46 +411,46 @@ export default function PaymentsPage() {
         </div>
 
         {/* Students Table */}
-        <div className="rounded-md border">
+        <div className="rounded-md pb-2 border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-right">الطالب</TableHead>
-                <TableHead className="text-right">السنة الدراسية</TableHead>
-                {isMainAdmin && <TableHead className="text-right">قسط المدرسة</TableHead>}
-                {isMainAdmin && <TableHead className="text-right">قسط المواصلات</TableHead>}
-                {isMainAdmin && <TableHead className="text-right">المجموع الكلي</TableHead>}
-                {isMainAdmin && <TableHead className="text-right">المدفوع</TableHead>}
-                <TableHead className="text-right">المتبقي</TableHead>
-                {isMainAdmin && <TableHead className="text-right">الإجراءات</TableHead>}
+                <TableHead className="text-center">الطالب</TableHead>
+                <TableHead className="text-center">السنة الدراسية</TableHead>
+                {isMainAdmin && <TableHead className="text-center">قسط المدرسة</TableHead>}
+                {isMainAdmin && <TableHead className="text-center">قسط المواصلات</TableHead>}
+                {isMainAdmin && <TableHead className="text-center">المجموع الكلي</TableHead>}
+                {isMainAdmin && <TableHead className="text-center">المدفوع</TableHead>}
+                <TableHead className="text-center">المتبقي</TableHead>
+                {isMainAdmin && <TableHead className="text-center">الإجراءات</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredFees.length === 0 ? (
+              {paginatedFees.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={isMainAdmin ? 8 : 3} className="text-center py-8">
                     لا توجد بيانات
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredFees.map((fee) => (
-                  <TableRow key={fee.id}>
+                paginatedFees.map((fee) => (
+                  <TableRow className="text-center" key={fee.id}>
                     <TableCell className="font-medium">{fee.student_name}</TableCell>
                     <TableCell>{formatArabicDate(fee.academic_year_name)}</TableCell>
                     {isMainAdmin && (
-                      <TableCell>{formatNumber(fee.school_fee)} ل.س</TableCell>
+                      <TableCell>{formatNumber(fee.school_fee)} $</TableCell>
                     )}
                     {isMainAdmin && (
-                      <TableCell>{formatNumber(fee.transport_fee)} ل.س</TableCell>
+                      <TableCell>{formatNumber(fee.transport_fee)} $</TableCell>
                     )}
                     {isMainAdmin && (
-                      <TableCell className="font-medium">{formatNumber(fee.total_fees || 0)} ل.س</TableCell>
+                      <TableCell className="font-medium">{formatNumber(fee.total_fees || 0)} $</TableCell>
                     )}
                     {isMainAdmin && (
-                      <TableCell className="text-green-600">{formatNumber(fee.total_paid || 0)} ل.س</TableCell>
+                      <TableCell className="text-green-600">{formatNumber(fee.total_paid || 0)} $</TableCell>
                     )}
                     <TableCell className={fee.remaining_balance && fee.remaining_balance > 0 ? 'text-red-600' : 'text-green-600'}>
-                      {formatNumber(fee.remaining_balance || 0)} ل.س
+                      {formatNumber(fee.remaining_balance || 0)} $
                     </TableCell>
                     {isMainAdmin && (
                       <TableCell className="text-center">
@@ -390,6 +462,17 @@ export default function PaymentsPage() {
                           >
                             <Eye className="h-4 w-4 text-blue-600" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setFeeToDelete(fee);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     )}
@@ -398,7 +481,92 @@ export default function PaymentsPage() {
               )}
             </TableBody>
           </Table>
-        </div>
+
+            {/* Pagination */}
+            {filteredFees.length > 0 && (
+              <div className="flex items-center justify-between mt-4 px-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>عرض</span>
+                  <Select
+                    value={itemsPerPage.toString()}
+                    onValueChange={(value) => setItemsPerPage(Number(value))}
+                  >
+                    <SelectTrigger className="w-20 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">{formatNumber(10)}</SelectItem>
+                      <SelectItem value="25">{formatNumber(25)}</SelectItem>
+                      <SelectItem value="50">{formatNumber(50)}</SelectItem>
+                      <SelectItem value="100">{formatNumber(100)}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span>من أصل {formatNumber(filteredFees.length)} سجل</span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    الأولى
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    السابق
+                  </Button>
+                  <span className="px-3 py-1 text-sm">
+                    {formatNumber(currentPage)} \ {formatNumber(totalPages)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    التالي
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    الأخيرة
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+              <AlertDialogDescription>
+                سيتم حذف سجل القسط نهائياً ولا يمكن استرجاعه.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
+                إلغاء
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteFee}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                حذف
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Teacher Sessions Toggle - Main Admin Only */}
         {isMainAdmin && (
@@ -446,23 +614,69 @@ export default function PaymentsPage() {
                 <DialogTitle>إضافة قسط جديد</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleAdd} className="space-y-4 mt-4">
-                <div className="space-y-2">
+                <div className="space-y-2 relative">
                   <Label>الطالب</Label>
-                  <Select
-                    value={formData.student_id}
-                    onValueChange={(value) => setFormData({ ...formData, student_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر الطالب" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {students.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="relative">
+                    <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="ابحث باسم الطالب..."
+                      value={studentSearchQuery}
+                      onChange={(e) => {
+                        setStudentSearchQuery(e.target.value);
+                        setShowStudentSuggestions(true);
+                        if (!e.target.value) {
+                          setFormData({ ...formData, student_id: '' });
+                        }
+                      }}
+                      onFocus={() => setShowStudentSuggestions(true)}
+                      className="pr-10"
+                    />
+                    {formData.student_id && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute left-2 top-1 h-7 w-7 p-0"
+                        onClick={() => {
+                          setStudentSearchQuery('');
+                          setFormData({ ...formData, student_id: '' });
+                          setShowStudentSuggestions(false);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {/* Student Suggestions */}
+                  {showStudentSuggestions && studentSearchQuery && (
+                    <div className="absolute z-50 w-full bg-white border rounded-md shadow-lg max-h-60 overflow-auto mt-1">
+                      {students
+                        .filter((s) =>
+                          s.name.toLowerCase().includes(studentSearchQuery.toLowerCase())
+                        )
+                        .map((student) => (
+                          <div
+                            key={student.id}
+                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                            onClick={() => {
+                              setFormData({ ...formData, student_id: student.id });
+                              setStudentSearchQuery(student.name);
+                              setShowStudentSuggestions(false);
+                            }}
+                          >
+                            <div className="font-medium">{student.name}</div>
+                            {student.class_name && (
+                              <div className="text-sm text-gray-500">{student.class_name}</div>
+                            )}
+                          </div>
+                        ))}
+                      {students.filter((s) =>
+                        s.name.toLowerCase().includes(studentSearchQuery.toLowerCase())
+                      ).length === 0 && (
+                        <div className="px-3 py-2 text-gray-500 text-center">لا يوجد طلاب مطابقين</div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -485,7 +699,7 @@ export default function PaymentsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>قسط المدرسة (ل.س)</Label>
+                  <Label>قسط المدرسة ($)</Label>
                   <Input
                     type="number"
                     min="0"
@@ -496,7 +710,7 @@ export default function PaymentsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>قسط المواصلات (ل.س)</Label>
+                  <Label>قسط المواصلات ($)</Label>
                   <Input
                     type="number"
                     min="0"

@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Trash2, UserCog } from 'lucide-react';
+import { Plus, Trash2, UserCog, Search } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +26,7 @@ import { formatDate } from '@/utils/date';
 import { getAuthHeaders } from '@/lib/auth-client';
 
 export default function TeacherAssignmentsPage() {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [assignments, setAssignments] = useState<TeacherAssignment[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -37,6 +40,7 @@ export default function TeacherAssignmentsPage() {
     subject_id: '',
     class_id: '',
   });
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadData();
@@ -64,7 +68,11 @@ export default function TeacherAssignmentsPage() {
       if (subjectsRes.ok) setSubjects(subjectsData.subjects || []);
     } catch (error) {
       console.error('Load data error:', error);
-      alert('فشل في تحميل البيانات');
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل البيانات',
+        variant: 'destructive',
+      });
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -73,7 +81,11 @@ export default function TeacherAssignmentsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.teacher_id || !formData.subject_id || !formData.class_id) {
-      alert('جميع الحقول مطلوبة');
+      toast({
+        title: 'خطأ',
+        description: 'جميع الحقول مطلوبة',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -91,9 +103,25 @@ export default function TeacherAssignmentsPage() {
         setIsAddDialogOpen(false);
         setFormData({ teacher_id: '', subject_id: '', class_id: '' });
         loadData(false);
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم إضافة التعيين',
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: 'خطأ',
+          description: error.error || 'فشل في إضافة التعيين',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error adding assignment:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -115,16 +143,39 @@ export default function TeacherAssignmentsPage() {
         setIsDeleteDialogOpen(false);
         setSelectedAssignment(null);
         loadData(false);
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حذف التعيين',
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: 'خطأ',
+          description: error.error || 'فشل في حذف التعيين',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error deleting assignment:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
+  // Filter assignments based on search query (by teacher name)
+  const filteredAssignments = assignments.filter((assignment) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return assignment.teacher_name?.toLowerCase().includes(query);
+  });
+
   return (
     <DashboardLayout sidebarItems={[...ADMIN_SIDEBAR_ITEMS]} userRole="admin">
-      <div className="p-6" dir="rtl">
-        <div className="flex justify-between items-center mb-6">
+      <div className="p-6 space-y-6">
+        <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <UserCog className="h-8 w-8 text-brand-primary-blue" />
             <h1 className="text-2xl font-bold">تعيين المعلمين</h1>
@@ -136,6 +187,17 @@ export default function TeacherAssignmentsPage() {
             <Plus className="h-4 w-4 ml-2" />
             إضافة تعيين
           </Button>
+        </div>
+
+        {/* Search */}
+        <div className="relative w-full max-w-md mb-6">
+          <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="بحث بالاسم..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pr-10"
+          />
         </div>
 
         {loading ? (
@@ -153,14 +215,14 @@ export default function TeacherAssignmentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {assignments.length === 0 ? (
+                {filteredAssignments.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                      لا توجد تعيينات
+                      {searchQuery ? 'لا توجد نتائج للبحث' : 'لا توجد تعيينات'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  assignments.map((assignment) => (
+                  filteredAssignments.map((assignment) => (
                     <TableRow key={assignment.id}>
                       <TableCell className="font-medium text-center">{assignment.teacher_name}</TableCell>
                       <TableCell className="text-center">{assignment.subject_name}</TableCell>
@@ -244,7 +306,7 @@ export default function TeacherAssignmentsPage() {
                   ))}
                 </select>
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="grid gap-6 md:grid-cols-2">
                 <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                   إلغاء
                 </Button>

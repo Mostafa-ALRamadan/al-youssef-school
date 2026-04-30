@@ -210,7 +210,6 @@ export default function PaymentDetailsPage() {
     
     if (remainingBalance === 0) {
       const errorMsg = 'لا يوجد رصيد متبقي للدفع - تم تسديد كامل المبلغ';
-      alert(errorMsg);
       toast({
         title: 'خطأ',
         description: errorMsg,
@@ -222,7 +221,6 @@ export default function PaymentDetailsPage() {
     // Check if amount exceeds remaining balance
     if (amount > remainingBalance) {
       const errorMsg = `المبلغ المدفوع (${formatNumber(amount)}) يتجاوز الرصيد المتبقي (${formatNumber(remainingBalance)})`;
-      alert(errorMsg);
       toast({
         title: 'خطأ',
         description: errorMsg,
@@ -372,7 +370,7 @@ export default function PaymentDetailsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatNumber(fee.school_fee)}</div>
-              <p className="text-xs text-muted-foreground">ل.س</p>
+              <p className="text-xs text-muted-foreground">$</p>
             </CardContent>
           </Card>
           <Card>
@@ -382,7 +380,7 @@ export default function PaymentDetailsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatNumber(fee.transport_fee)}</div>
-              <p className="text-xs text-muted-foreground">ل.س</p>
+              <p className="text-xs text-muted-foreground">$</p>
             </CardContent>
           </Card>
           <Card>
@@ -392,7 +390,7 @@ export default function PaymentDetailsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">{formatNumber(fee.total_paid || 0)}</div>
-              <p className="text-xs text-muted-foreground">ل.س</p>
+              <p className="text-xs text-muted-foreground">$</p>
             </CardContent>
           </Card>
           <Card>
@@ -404,7 +402,7 @@ export default function PaymentDetailsPage() {
               <div className={`text-2xl font-bold ${fee.remaining_balance && fee.remaining_balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                 {formatNumber(fee.remaining_balance || 0)}
               </div>
-              <p className="text-xs text-muted-foreground">ل.س</p>
+              <p className="text-xs text-muted-foreground">$</p>
             </CardContent>
           </Card>
         </div>
@@ -442,7 +440,7 @@ export default function PaymentDetailsPage() {
                 ) : (
                   payments.map((payment) => (
                     <TableRow key={payment.id}>
-                      <TableCell className="font-medium text-green-600">{formatNumber(payment.amount)} ل.س</TableCell>
+                      <TableCell className="font-medium text-green-600">{formatNumber(payment.amount)} $</TableCell>
                       <TableCell>{formatDate(payment.payment_date)}</TableCell>
                       <TableCell>{getPaymentMethodLabel(payment.payment_method)}</TableCell>
                       <TableCell>{payment.notes || '-'}</TableCell>
@@ -475,7 +473,7 @@ export default function PaymentDetailsPage() {
               </DialogHeader>
               <form onSubmit={handleAddPayment} className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label>المبلغ (ل.س)</Label>
+                  <Label>المبلغ ($)</Label>
                   <Input
                     type="number"
                     min="0.01"
@@ -486,7 +484,7 @@ export default function PaymentDetailsPage() {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    الرصيد المتبقي: {formatNumber(fee.remaining_balance || 0)} ل.س
+                    الرصيد المتبقي: {formatNumber(fee.remaining_balance || 0)} $
                   </p>
                 </div>
 
@@ -542,16 +540,21 @@ export default function PaymentDetailsPage() {
         {/* Delete Payment Confirmation */}
         {isMainAdmin && (
           <AlertDialog open={!!selectedPayment} onOpenChange={() => setSelectedPayment(null)}>
-            <AlertDialogContent>
+            <AlertDialogContent dir="rtl">
               <AlertDialogHeader>
                 <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
-                <AlertDialogDescription>
-                  هل أنت متأكد من حذف هذه الدفعة؟ لا يمكن التراجع عن هذا الإجراء.
+                <AlertDialogDescription dir="rtl" className="text-right">
+                  هل أنت متأكد من حذف هذه الدفعة؟
+                  <br />
+                  لا يمكن التراجع عن هذا الإجراء.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setSelectedPayment(null)}>إلغاء</AlertDialogCancel>
-                <AlertDialogAction onClick={() => selectedPayment && handleDeletePayment(selectedPayment.id)} className="bg-red-600">
+              <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => selectedPayment && handleDeletePayment(selectedPayment.id)}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
                   حذف
                 </AlertDialogAction>
               </AlertDialogFooter>

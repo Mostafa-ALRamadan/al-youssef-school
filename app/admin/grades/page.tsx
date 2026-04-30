@@ -7,6 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ADMIN_SIDEBAR_ITEMS } from '@/constants';
@@ -127,16 +137,24 @@ export default function AdminGradesPage() {
   };
 
   const handleDeleteExam = async (examId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الامتحان؟ سيتم حذف جميع الدرجات المرتبطة به.')) {
-      return;
-    }
+    setExamToDelete(examId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [examToDelete, setExamToDelete] = useState<string | null>(null);
+
+  const handleDeleteConfirm = async () => {
+    if (!examToDelete) return;
 
     try {
-      const response = await fetch(`/api/admin/grades/${examId}`, {
+      const response = await fetch(`/api/admin/grades/${examToDelete}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
+        setIsDeleteDialogOpen(false);
+        setExamToDelete(null);
         toast({
           title: 'تم بنجاح',
           description: 'تم حذف الامتحان بنجاح',
@@ -444,25 +462,25 @@ export default function AdminGradesPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-5 gap-2 text-center">
-                          <div className="bg-green-50 p-2 rounded">
-                            <div className="text-xl font-bold text-green-700">{stats.categories.excellent}</div>
-                            <div className="text-xs text-green-600">ممتاز</div>
-                          </div>
-                          <div className="bg-blue-50 p-2 rounded">
-                            <div className="text-xl font-bold text-blue-700">{stats.categories.veryGood}</div>
-                            <div className="text-xs text-blue-600">جيد جداً</div>
-                          </div>
-                          <div className="bg-yellow-50 p-2 rounded">
-                            <div className="text-xl font-bold text-yellow-700">{stats.categories.good}</div>
-                            <div className="text-xs text-yellow-600">جيد</div>
+                          <div className="bg-red-50 p-2 rounded">
+                            <div className="text-xl font-bold text-red-700">{stats.categories.weak}</div>
+                            <div className="text-xs text-red-600">ضعيف</div>
                           </div>
                           <div className="bg-orange-50 p-2 rounded">
                             <div className="text-xl font-bold text-orange-700">{stats.categories.average}</div>
                             <div className="text-xs text-orange-600">وسط</div>
                           </div>
-                          <div className="bg-red-50 p-2 rounded">
-                            <div className="text-xl font-bold text-red-700">{stats.categories.weak}</div>
-                            <div className="text-xs text-red-600">ضعيف</div>
+                          <div className="bg-yellow-50 p-2 rounded">
+                            <div className="text-xl font-bold text-yellow-700">{stats.categories.good}</div>
+                            <div className="text-xs text-yellow-600">جيد</div>
+                          </div>
+                          <div className="bg-blue-50 p-2 rounded">
+                            <div className="text-xl font-bold text-blue-700">{stats.categories.veryGood}</div>
+                            <div className="text-xs text-blue-600">جيد جداً</div>
+                          </div>
+                          <div className="bg-green-50 p-2 rounded">
+                            <div className="text-xl font-bold text-green-700">{stats.categories.excellent}</div>
+                            <div className="text-xs text-green-600">ممتاز</div>
                           </div>
                         </div>
                       </CardContent>
@@ -525,6 +543,29 @@ export default function AdminGradesPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+              <AlertDialogDescription dir="rtl" className="text-right">
+                هل أنت متأكد من حذف هذا الامتحان؟
+                <br />
+                سيتم حذف جميع الدرجات المرتبطة به. لا يمكن التراجع عن هذا الإجراء.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                حذف
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );

@@ -7,6 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Lightbulb, Trash2, MessageSquare, Reply } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MainAdminGuard } from '@/components/auth/MainAdminGuard';
@@ -14,6 +24,7 @@ import { ADMIN_SIDEBAR_ITEMS, USER_ROLES } from '@/constants';
 import { getAuthHeaders } from '@/lib/auth-client';
 import type { Complaint } from '@/types';
 import { formatDate } from '@/utils/date';
+import { formatNumber } from '@/utils/number';
 
 export default function AdminComplaintsPage() {
   const { toast } = useToast();
@@ -23,6 +34,28 @@ export default function AdminComplaintsPage() {
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
+  
+  // Delete confirmation states
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [complaintToDelete, setComplaintToDelete] = useState<string | null>(null);
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+
+  // Pagination logic
+  const totalPages = Math.ceil(complaints.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedComplaints = complaints.slice(startIndex, startIndex + itemsPerPage);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   useEffect(() => {
     loadComplaints();
@@ -72,15 +105,22 @@ export default function AdminComplaintsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه الشكوى؟')) return;
+    setComplaintToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!complaintToDelete) return;
 
     try {
-      const response = await fetch(`/api/complaints/${id}`, {
+      const response = await fetch(`/api/complaints/${complaintToDelete}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
 
       if (response.ok) {
+        setIsDeleteDialogOpen(false);
+        setComplaintToDelete(null);
         toast({
           title: 'تم بنجاح',
           description: 'تم حذف الشكوى',
@@ -96,6 +136,11 @@ export default function AdminComplaintsPage() {
       }
     } catch (error) {
       console.error('Error deleting complaint:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -172,140 +217,227 @@ export default function AdminComplaintsPage() {
           {/* Header */}
           <div className="flex items-center gap-3">
             <MessageSquare className="h-8 w-8 text-brand-primary-blue" />
-          <h1 className="text-2xl font-bold">صندوق الشكاوي</h1>
-        </div>
+            <h1 className="text-2xl font-bold">صندوق الشكاوي</h1>
+          </div>
 
-        {/* Complaints List */}
-        {loading ? (
-          <div className="text-center py-8">جاري التحميل...</div>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lightbulb className="h-5 w-5" />
-                قائمة الشكاوي
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {complaints.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  لا توجد شكاوي
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">العنوان</TableHead>
-                      <TableHead className="text-right">الرسالة</TableHead>
-                      <TableHead className="text-right">الحالة</TableHead>
-                      <TableHead className="text-right">تاريخ الإرسال</TableHead>
-                      <TableHead className="text-right">الإجراءات</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {complaints.map((complaint) => (
-                      <TableRow key={complaint.id}>
-                        <TableCell className="font-medium">{complaint.title}</TableCell>
-                        <TableCell className="max-w-md truncate">{complaint.message}</TableCell>
-                        <TableCell>
+          {/* Complaints List */}
+          {loading ? (
+            <div className="text-center py-8">جاري التحميل...</div>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5" />
+                  قائمة الشكاوي
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {paginatedComplaints.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    لا توجد شكاوي
+                  </div>
+                ) : (
+                  <>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-right">العنوان</TableHead>
+                          <TableHead className="text-right">الرسالة</TableHead>
+                          <TableHead className="text-right">الحالة</TableHead>
+                          <TableHead className="text-right">تاريخ الإرسال</TableHead>
+                          <TableHead className="text-right">الإجراءات</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedComplaints.map((complaint) => (
+                          <TableRow key={complaint.id}>
+                            <TableCell className="font-medium">{complaint.title}</TableCell>
+                            <TableCell className="max-w-md truncate">{complaint.message}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={complaint.status}
+                                onValueChange={(value) => handleStatusChange(complaint.id, value as Complaint['status'])}
+                              >
+                                <SelectTrigger dir="rtl" className="w-32">
+                                  <SelectValue>
+                                    <span className={`px-2 py-1 rounded text-xs ${getStatusColor(complaint.status)}`}>
+                                      {getStatusLabel(complaint.status)}
+                                    </span>
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">معلق</SelectItem>
+                                  <SelectItem value="in_progress">تم المراجعة</SelectItem>
+                                  <SelectItem value="resolved">تم التنفيذ</SelectItem>
+                                  <SelectItem value="closed">مرفوض</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(complaint.created_at)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openReplyDialog(complaint)}
+                                  title={complaint.reply ? 'عرض/تعديل الرد' : 'إضافة رد'}
+                                >
+                                  <Reply className={`h-4 w-4 ${complaint.reply ? 'text-green-600' : 'text-blue-600'}`} />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(complaint.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+
+                    {/* Pagination */}
+                    {complaints.length > 0 && (
+                      <div className="flex items-center justify-between mt-4 px-2">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <span>عرض</span>
                           <Select
-                            value={complaint.status}
-                            onValueChange={(value) => handleStatusChange(complaint.id, value as Complaint['status'])}
+                            value={itemsPerPage.toString()}
+                            onValueChange={(value) => setItemsPerPage(Number(value))}
                           >
-                            <SelectTrigger dir="rtl" className="w-32">
-                              <SelectValue>
-                                <span className={`px-2 py-1 rounded text-xs ${getStatusColor(complaint.status)}`}>
-                                  {getStatusLabel(complaint.status)}
-                                </span>
-                              </SelectValue>
+                            <SelectTrigger className="w-20 h-8">
+                              <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="pending">معلق</SelectItem>
-                              <SelectItem value="in_progress">تم المراجعة</SelectItem>
-                              <SelectItem value="resolved">تم التنفيذ</SelectItem>
-                              <SelectItem value="closed">مرفوض</SelectItem>
+                              <SelectItem value="10">{formatNumber(10)}</SelectItem>
+                              <SelectItem value="25">{formatNumber(25)}</SelectItem>
+                              <SelectItem value="50">{formatNumber(50)}</SelectItem>
+                              <SelectItem value="100">{formatNumber(100)}</SelectItem>
                             </SelectContent>
                           </Select>
-                        </TableCell>
-                        <TableCell>
-                          {formatDate(complaint.created_at)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openReplyDialog(complaint)}
-                              title={complaint.reply ? 'عرض/تعديل الرد' : 'إضافة رد'}
-                            >
-                              <Reply className={`h-4 w-4 ${complaint.reply ? 'text-green-600' : 'text-blue-600'}`} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(complaint.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                          <span>من أصل {formatNumber(complaints.length)} شكوى</span>
+                        </div>
 
-        {/* Reply Dialog */}
-        <Dialog open={replyDialogOpen} onOpenChange={setReplyDialogOpen}>
-          <DialogContent className="max-w-lg [&>button]:hidden" dir="rtl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Reply className="h-5 w-5" />
-                {selectedComplaint?.reply ? 'تعديل الرد' : 'إضافة رد'}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              {selectedComplaint && (
-                <>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm text-gray-600 mb-1">الشكوى:</p>
-                    <p className="font-medium">{selectedComplaint.title}</p>
-                    <p className="text-sm text-gray-600 mt-1">{selectedComplaint.message}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium block mb-2">الرد:</label>
-                    <textarea
-                      value={replyText}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReplyText(e.target.value)}
-                      placeholder="اكتب ردك هنا..."
-                      rows={4}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary-blue"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setReplyDialogOpen(false)}
-                      disabled={submittingReply}
-                    >
-                      إلغاء
-                    </Button>
-                    <Button
-                      onClick={handleReply}
-                      disabled={!replyText.trim() || submittingReply}
-                      className="bg-brand-primary-blue hover:bg-brand-dark-blue"
-                    >
-                      {submittingReply ? 'جاري الإرسال...' : (selectedComplaint.reply ? 'تحديث الرد' : 'إرسال الرد')}
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(1)}
+                            disabled={currentPage === 1}
+                          >
+                            الأولى
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                          >
+                            السابق
+                          </Button>
+                          <span className="px-3 py-1 text-sm">
+                            {formatNumber(currentPage)} \ {formatNumber(totalPages)}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                          >
+                            التالي
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(totalPages)}
+                            disabled={currentPage === totalPages}
+                          >
+                            الأخيرة
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Reply Dialog */}
+          <Dialog open={replyDialogOpen} onOpenChange={setReplyDialogOpen}>
+            <DialogContent className="max-w-lg [&>button]:hidden" dir="rtl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Reply className="h-5 w-5" />
+                  {selectedComplaint?.reply ? 'تعديل الرد' : 'إضافة رد'}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                {selectedComplaint && (
+                  <>
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-sm text-gray-600 mb-1">الشكوى:</p>
+                      <p className="font-medium">{selectedComplaint.title}</p>
+                      <p className="text-sm text-gray-600 mt-1">{selectedComplaint.message}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium block mb-2">الرد:</label>
+                      <textarea
+                        value={replyText}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReplyText(e.target.value)}
+                        placeholder="اكتب ردك هنا..."
+                        rows={4}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary-blue"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setReplyDialogOpen(false)}
+                        disabled={submittingReply}
+                      >
+                        إلغاء
+                      </Button>
+                      <Button
+                        onClick={handleReply}
+                        disabled={!replyText.trim() || submittingReply}
+                        className="bg-brand-primary-blue hover:bg-brand-dark-blue"
+                      >
+                        {submittingReply ? 'جاري الإرسال...' : (selectedComplaint.reply ? 'تحديث الرد' : 'إرسال الرد')}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Confirmation Dialog */}
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent dir="rtl">
+              <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+                <AlertDialogDescription dir="rtl" className="text-right">
+                  هل أنت متأكد من حذف هذه الشكوى؟
+                  <br />
+                  لا يمكن التراجع عن هذا الإجراء.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteConfirm}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  حذف
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </DashboardLayout>
     </MainAdminGuard>

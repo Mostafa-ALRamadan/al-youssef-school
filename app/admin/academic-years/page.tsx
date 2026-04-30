@@ -6,6 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
 import { CalendarDays, CheckCircle, Edit2, Plus, School, Trash2 } from 'lucide-react';
@@ -46,6 +56,12 @@ export default function AcademicYearsPage() {
   const [editSemesterDialogOpen, setEditSemesterDialogOpen] = useState(false);
   const [editingYear, setEditingYear] = useState<AcademicYear | null>(null);
   const [editingSemester, setEditingSemester] = useState<Semester | null>(null);
+
+  // Delete confirmation states
+  const [isDeleteYearDialogOpen, setIsDeleteYearDialogOpen] = useState(false);
+  const [isDeleteSemesterDialogOpen, setIsDeleteSemesterDialogOpen] = useState(false);
+  const [yearToDelete, setYearToDelete] = useState<string | null>(null);
+  const [semesterToDelete, setSemesterToDelete] = useState<string | null>(null);
 
   // Form states
   const [yearForm, setYearForm] = useState({
@@ -234,12 +250,15 @@ export default function AcademicYearsPage() {
   };
 
   const handleDeleteYear = async (yearId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه السنة الدراسية؟ سيتم حذف جميع الفصول المرتبطة بها أيضاً.')) {
-      return;
-    }
+    setYearToDelete(yearId);
+    setIsDeleteYearDialogOpen(true);
+  };
+
+  const handleDeleteYearConfirm = async () => {
+    if (!yearToDelete) return;
 
     try {
-      const response = await fetch(`/api/academic-years/${yearId}`, {
+      const response = await fetch(`/api/academic-years/${yearToDelete}`, {
         method: 'DELETE',
       });
 
@@ -252,6 +271,8 @@ export default function AcademicYearsPage() {
         title: 'تم بنجاح',
         description: 'تم حذف السنة الدراسية',
       });
+      setIsDeleteYearDialogOpen(false);
+      setYearToDelete(null);
       loadData();
     } catch (error) {
       console.error('Error deleting year:', error);
@@ -264,12 +285,15 @@ export default function AcademicYearsPage() {
   };
 
   const handleDeleteSemester = async (semesterId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الفصل الدراسي؟')) {
-      return;
-    }
+    setSemesterToDelete(semesterId);
+    setIsDeleteSemesterDialogOpen(true);
+  };
+
+  const handleDeleteSemesterConfirm = async () => {
+    if (!semesterToDelete) return;
 
     try {
-      const response = await fetch(`/api/semesters/${semesterId}`, {
+      const response = await fetch(`/api/semesters/${semesterToDelete}`, {
         method: 'DELETE',
       });
 
@@ -282,6 +306,8 @@ export default function AcademicYearsPage() {
         title: 'تم بنجاح',
         description: 'تم حذف الفصل الدراسي',
       });
+      setIsDeleteSemesterDialogOpen(false);
+      setSemesterToDelete(null);
       loadData();
     } catch (error) {
       console.error('Error deleting semester:', error);
@@ -775,6 +801,52 @@ export default function AcademicYearsPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Year Confirmation Dialog */}
+        <AlertDialog open={isDeleteYearDialogOpen} onOpenChange={setIsDeleteYearDialogOpen}>
+          <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+              <AlertDialogDescription dir="rtl" className="text-right">
+                هل أنت متأكد من حذف هذه السنة الدراسية؟
+                <br />
+                سيتم حذف جميع الفصول المرتبطة بها أيضاً. لا يمكن التراجع عن هذا الإجراء.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteYearConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                حذف
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete Semester Confirmation Dialog */}
+        <AlertDialog open={isDeleteSemesterDialogOpen} onOpenChange={setIsDeleteSemesterDialogOpen}>
+          <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+              <AlertDialogDescription dir="rtl" className="text-right">
+                هل أنت متأكد من حذف هذا الفصل الدراسي؟
+                <br />
+                لا يمكن التراجع عن هذا الإجراء.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteSemesterConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                حذف
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );

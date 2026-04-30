@@ -3,15 +3,9 @@
 import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TEACHER_SIDEBAR_ITEMS, USER_ROLES } from '@/constants';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Users } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Users, Search } from 'lucide-react';
 import { formatNumber } from '@/utils/number';
 import { getAuthHeaders } from '@/lib/auth-client';
 
@@ -32,6 +26,7 @@ export default function TeacherStudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -56,9 +51,18 @@ export default function TeacherStudentsPage() {
     }
   };
 
-  const filteredStudents = selectedClass === 'all'
-    ? students
-    : students.filter(s => s.class_name === classes.find(c => c.id === selectedClass)?.name);
+  const filteredStudents = students.filter((student) => {
+    // Apply class filter
+    const matchesClass = selectedClass === 'all' || 
+      student.class_name === classes.find(c => c.id === selectedClass)?.name;
+    // Apply search filter
+    if (!searchQuery) return matchesClass;
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = 
+      student.name?.toLowerCase().includes(query) ||
+      student.parent_name?.toLowerCase().includes(query);
+    return matchesClass && matchesSearch;
+  });
 
   return (
     <DashboardLayout
@@ -89,6 +93,17 @@ export default function TeacherStudentsPage() {
           </select>
         </div>
 
+        {/* Search */}
+        <div className="relative w-full max-w-md mb-6">
+          <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="بحث بالاسم..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pr-10"
+          />
+        </div>
+
         {/* Students Table */}
         {loading ? (
           <div className="text-center py-8">جاري التحميل...</div>
@@ -107,7 +122,7 @@ export default function TeacherStudentsPage() {
                 {filteredStudents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-8 text-gray-500">
-                      لا يوجد طلاب
+                      {searchQuery ? 'لا توجد نتائج للبحث' : 'لا يوجد طلاب'}
                     </TableCell>
                   </TableRow>
                 ) : (

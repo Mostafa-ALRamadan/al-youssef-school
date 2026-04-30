@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ADMIN_SIDEBAR_ITEMS } from '@/constants';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 import {
   Table,
   TableBody,
@@ -61,6 +62,7 @@ interface Teacher {
 }
 
 export default function TeachersPage() {
+  const { toast } = useToast();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +77,7 @@ export default function TeachersPage() {
     phone: '',
     subject_id: '',
   });
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchTeachers();
@@ -126,9 +129,24 @@ export default function TeachersPage() {
           subject_id: '',
         });
         fetchTeachers();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم إضافة المعلم',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في إضافة المعلم',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error adding teacher:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -159,9 +177,24 @@ export default function TeachersPage() {
           subject_id: '',
         });
         fetchTeachers();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم تحديث بيانات المعلم',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في تحديث المعلم',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error updating teacher:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -177,9 +210,24 @@ export default function TeachersPage() {
         setIsDeleteDialogOpen(false);
         setSelectedTeacher(null);
         fetchTeachers();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حذف المعلم',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في حذف المعلم',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error deleting teacher:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -200,10 +248,21 @@ export default function TeachersPage() {
     setIsDeleteDialogOpen(true);
   };
 
+  // Filter teachers based on search query
+  const filteredTeachers = teachers.filter((teacher) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      teacher.name?.toLowerCase().includes(query) ||
+      teacher.email?.toLowerCase().includes(query) ||
+      teacher.phone?.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <DashboardLayout sidebarItems={[...ADMIN_SIDEBAR_ITEMS]} userRole="admin">
       <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <GraduationCap className="h-8 w-8 text-brand-primary-blue" />
             <h1 className="text-2xl font-bold text-gray-900">إدارة المعلمين</h1>
@@ -291,6 +350,17 @@ export default function TeachersPage() {
           </Dialog>
         </div>
 
+        {/* Search */}
+        <div className="relative w-full max-w-md mb-6">
+          <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="بحث بالاسم أو البريد الإلكتروني..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pr-10"
+          />
+        </div>
+
         {loading ? (
           <div className="text-center py-8">جاري التحميل...</div>
         ) : (
@@ -307,14 +377,14 @@ export default function TeachersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {teachers.length === 0 ? (
+                {filteredTeachers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                      لا يوجد معلمين
+                      {searchQuery ? 'لا توجد نتائج للبحث' : 'لا يوجد معلمين'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  teachers.map((teacher) => (
+                  filteredTeachers.map((teacher) => (
                     <TableRow key={teacher.id}>
                       <TableCell className="font-medium text-center">{teacher.name}</TableCell>
                       <TableCell className="text-center">{teacher.email || '-'}</TableCell>
@@ -403,7 +473,7 @@ export default function TeachersPage() {
 
         {/* Delete Alert Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent dir="rtl">
             <AlertDialogHeader>
               <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
               <AlertDialogDescription dir="rtl" className="text-right">
@@ -412,13 +482,11 @@ export default function TeachersPage() {
                 لا يمكن التراجع عن هذا الإجراء.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
-                إلغاء
-              </AlertDialogCancel>
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDelete}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 حذف
               </AlertDialogAction>

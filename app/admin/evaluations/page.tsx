@@ -14,6 +14,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Star, Users, Search, Trash2, Filter, Pencil } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { getAuthHeaders } from '@/lib/auth-client';
 import type { StudentEvaluation } from '@/types';
 import { formatDate } from '@/utils/date';
@@ -65,6 +75,10 @@ export default function AdminEvaluationsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   // Track if initial semester load is complete to prevent premature evaluation loading
   const [isSemesterLoaded, setIsSemesterLoaded] = useState(false);
+  
+  // Delete confirmation states
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [evaluationToDelete, setEvaluationToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadClasses();
@@ -158,17 +172,25 @@ export default function AdminEvaluationsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا التقييم؟')) return;
+    setEvaluationToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!evaluationToDelete) return;
 
     try {
-      const response = await fetch(`/api/student-evaluations?id=${id}`, {
+      const response = await fetch(`/api/student-evaluations?id=${evaluationToDelete}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete evaluation');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete evaluation');
       }
 
+      setIsDeleteDialogOpen(false);
+      setEvaluationToDelete(null);
       loadEvaluations();
     } catch (error) {
       console.error('Error deleting evaluation:', error);
@@ -417,6 +439,29 @@ export default function AdminEvaluationsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+              <AlertDialogDescription dir="rtl" className="text-right">
+                هل أنت متأكد من حذف هذا التقييم؟
+                <br />
+                لا يمكن التراجع عن هذا الإجراء.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                حذف
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );

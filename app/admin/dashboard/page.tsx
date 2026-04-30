@@ -231,7 +231,7 @@ export default function AdminDashboardPage() {
                     {formatDate(stats.latestPayment.payment_date || stats.latestPayment.created_at)}
                   </span>
                   <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded">
-                    {formatNumber(stats.latestPayment.amount)} ل.س
+                    {formatNumber(stats.latestPayment.amount)} $
                   </span>
                 </div>
                 <p className="font-medium text-gray-900">

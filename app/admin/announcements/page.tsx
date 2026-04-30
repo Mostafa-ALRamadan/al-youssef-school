@@ -8,6 +8,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
 import { Megaphone, Plus, Pencil, Trash2 } from 'lucide-react';
@@ -26,6 +36,10 @@ export default function AdminAnnouncementsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  
+  // Delete confirmation states
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [announcementToDelete, setAnnouncementToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -48,6 +62,11 @@ export default function AdminAnnouncementsPage() {
       }
     } catch (error) {
       console.error('Error loading announcements:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل الإعلانات',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -84,6 +103,11 @@ export default function AdminAnnouncementsPage() {
       }
     } catch (error) {
       console.error('Error creating announcement:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في إنشاء الإعلان',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -124,19 +148,31 @@ export default function AdminAnnouncementsPage() {
       }
     } catch (error) {
       console.error('Error updating announcement:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحديث الإعلان',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الإعلان؟')) return;
+    setAnnouncementToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!announcementToDelete) return;
 
     try {
-      const response = await fetch(`/api/announcements/${id}`, {
+      const response = await fetch(`/api/announcements/${announcementToDelete}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
 
       if (response.ok) {
+        setIsDeleteDialogOpen(false);
+        setAnnouncementToDelete(null);
         toast({
           title: 'تم بنجاح',
           description: 'تم حذف الإعلان بنجاح',
@@ -152,6 +188,11 @@ export default function AdminAnnouncementsPage() {
       }
     } catch (error) {
       console.error('Error deleting announcement:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -382,6 +423,29 @@ export default function AdminAnnouncementsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+              <AlertDialogDescription dir="rtl" className="text-right">
+                هل أنت متأكد من حذف هذا الإعلان؟
+                <br />
+                لا يمكن التراجع عن هذا الإجراء.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                حذف
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );

@@ -1,5 +1,4 @@
 // Client-side auth utilities for getting JWT tokens
-import { jwtVerify } from 'jose';
 
 const TOKEN_KEY = 'auth_token';
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ADMIN_SIDEBAR_ITEMS } from '@/constants';
 import { Button } from '@/components/ui/button';
+import { toast, useToast } from '@/components/ui/use-toast';
 import {
   Table,
   TableBody,
@@ -62,6 +63,11 @@ export default function ClassesPage() {
       }
     } catch (error) {
       console.error('Error fetching classes:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل الصفوف',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -80,9 +86,25 @@ export default function ClassesPage() {
         setIsAddDialogOpen(false);
         setFormData({ name: '' });
         fetchClasses();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم إنشاء الصف',
+        });
+      } else {
+        const data = await response.json();
+        toast({
+          title: 'خطأ',
+          description: data.error || 'فشل في إنشاء الصف',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error adding class:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -102,9 +124,25 @@ export default function ClassesPage() {
         setSelectedClass(null);
         setFormData({ name: '' });
         fetchClasses();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم تحديث الصف',
+        });
+      } else {
+        const data = await response.json();
+        toast({
+          title: 'خطأ',
+          description: data.error || 'فشل في تحديث الصف',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error updating class:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -120,13 +158,25 @@ export default function ClassesPage() {
         setIsDeleteDialogOpen(false);
         setSelectedClass(null);
         fetchClasses();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حذف الصف',
+        });
       } else {
         const data = await response.json();
-        alert(data.error || 'فشل في حذف الصف');
+        toast({
+          title: 'خطأ',
+          description: data.error || 'فشل في حذف الصف',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error deleting class:', error);
-      alert('فشل في حذف الصف');
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -267,7 +317,7 @@ export default function ClassesPage() {
 
         {/* Delete Alert Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent dir="rtl">
             <AlertDialogHeader>
               <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
               <AlertDialogDescription dir="rtl" className="text-right">
@@ -276,13 +326,11 @@ export default function ClassesPage() {
                 لا يمكن التراجع عن هذا الإجراء.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
-                إلغاء
-              </AlertDialogCancel>
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDelete}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 حذف
               </AlertDialogAction>

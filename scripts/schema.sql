@@ -177,7 +177,6 @@ CREATE TABLE IF NOT EXISTS attendance_sessions (
     schedule_id UUID NOT NULL REFERENCES weekly_schedule(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
-    notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

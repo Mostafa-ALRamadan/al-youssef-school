@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Plus, Pencil, Trash2, Search, Users, Upload, X } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import Image from 'next/image';
@@ -50,6 +58,7 @@ type FormData = {
 };
 
 export default function StudentsPage() {
+  const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,6 +84,10 @@ export default function StudentsPage() {
   const [showParentSuggestions, setShowParentSuggestions] = useState(false);
 
   const [isExistingParent, setIsExistingParent] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   // Image cropper states
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -135,11 +148,25 @@ export default function StudentsPage() {
         setIsAddDialogOpen(false);
         setFormData({ name: '', class_id: '', parent_name: '', parent_password: '', parent_phone: '', parent_address: '', date_of_birth: '', gender: '' });
         fetchStudents();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم إضافة الطالب',
+        });
       } else {
         console.error('Error:', data.error);
+        toast({
+          title: 'خطأ',
+          description: data.error || 'فشل في إضافة الطالب',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Fetch error:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -160,9 +187,25 @@ export default function StudentsPage() {
         setIsEditDialogOpen(false);
         setSelectedStudent(null);
         fetchStudents();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم تحديث بيانات الطالب',
+        });
+      } else {
+        console.error('Error:', data.error);
+        toast({
+          title: 'خطأ',
+          description: data.error || 'فشل في تحديث الطالب',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
-      // Error handling silently
+      console.error('Fetch error:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -181,9 +224,24 @@ export default function StudentsPage() {
         setIsDeleteDialogOpen(false);
         setSelectedStudent(null);
         fetchStudents();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حذف الطالب',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: data.error || 'فشل في حذف الطالب',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
-      // Error handling silently
+      console.error('Delete error:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -364,15 +422,43 @@ export default function StudentsPage() {
 
   // Convert phone numbers to Arabic numerals
   const formatPhoneNumber = (phone: string | undefined) => {
-    if (!phone) return phone || '';
+    if (!phone) return '';
     return formatNumber(phone);
+  };
+
+  // Filter students based on search query
+  const filteredStudents = students.filter((student) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      student.name?.toLowerCase().includes(query) ||
+      student.login_name?.toLowerCase().includes(query) ||
+      student.parent_name?.toLowerCase().includes(query) ||
+      student.parent_phone?.toLowerCase().includes(query)
+    );
+  });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedStudents = filteredStudents.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, itemsPerPage]);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
   };
 
   return (
     <DashboardLayout sidebarItems={ADMIN_SIDEBAR_ITEMS} userRole={USER_ROLES.ADMIN}>
       <div className="p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <Users className="h-8 w-8 text-brand-primary-blue" />
             <h1 className="text-2xl font-bold text-gray-900">إدارة الطلاب وأولياء الأمور</h1>
@@ -527,11 +613,22 @@ export default function StudentsPage() {
           </Dialog>
         </div>
 
+        {/* Search */}
+        <div className="relative w-full max-w-md mb-6">
+          <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="بحث بالاسم أو رقم الهاتف..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pr-10"
+          />
+        </div>
+
         {/* Students Table */}
           {isLoading ? (
             <div className="text-center py-8">جاري التحميل...</div>
           ) : (
-          <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+          <div className="bg-white pb-2 rounded-lg border shadow-sm overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50">
@@ -548,14 +645,14 @@ export default function StudentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {students.length === 0 ? (
+                {paginatedStudents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} className="text-center py-8 text-gray-500">
-                      لا يوجد طلاب حالياً
+                      {searchQuery ? 'لا توجد نتائج للبحث' : 'لا يوجد طلاب حالياً'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  students.map((student) => (
+                  paginatedStudents.map((student) => (
                     <TableRow key={student.id}>
                       <TableCell className="text-center px-4 py-3 font-medium">{student.name}</TableCell>
                       <TableCell className="text-center px-4 py-3">{student.class_name || '-'}</TableCell>
@@ -590,6 +687,68 @@ export default function StudentsPage() {
                 )}
               </TableBody>
             </Table>
+
+            {/* Pagination */}
+            {filteredStudents.length > 0 && (
+              <div className="flex items-center justify-between mt-4 px-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>عرض</span>
+                  <Select
+                    value={itemsPerPage.toString()}
+                    onValueChange={(value) => setItemsPerPage(Number(value))}
+                  >
+                    <SelectTrigger className="w-20 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">{formatNumber(10)}</SelectItem>
+                      <SelectItem value="25">{formatNumber(25)}</SelectItem>
+                      <SelectItem value="50">{formatNumber(50)}</SelectItem>
+                      <SelectItem value="100">{formatNumber(100)}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span>من أصل {formatNumber(filteredStudents.length)} طالب</span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    الأولى
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    السابق
+                  </Button>
+                  <span className="px-3 py-1 text-sm">
+                    {formatNumber(currentPage)} \ {formatNumber(totalPages)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    التالي
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    الأخيرة
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           )}
 
@@ -806,20 +965,20 @@ export default function StudentsPage() {
 
         {/* Delete Alert Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent dir="rtl">
             <AlertDialogHeader>
-              <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+              <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
               <AlertDialogDescription dir="rtl" className="text-right">
-                سيتم حذف الطالب &quot;{selectedStudent?.name}&quot; نهائياً.
+                هل أنت متأكد من حذف الطالب &quot;{selectedStudent?.name}&quot;؟
                 <br />
-                هذا الإجراء لا يمكن التراجع عنه.
+                لا يمكن التراجع عن هذا الإجراء.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
               <AlertDialogCancel>إلغاء</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDelete}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 حذف
               </AlertDialogAction>

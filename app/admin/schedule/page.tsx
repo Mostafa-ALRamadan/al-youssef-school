@@ -6,6 +6,7 @@ import { ADMIN_SIDEBAR_ITEMS } from '@/constants';
 import { USER_ROLES } from '@/constants';
 import { getAuthHeaders } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 import {
   Card,
   CardContent,
@@ -96,6 +97,7 @@ const DAYS_OF_WEEK = [
 
 
 export default function AdminSchedulePage() {
+  const { toast } = useToast();
   const [schedules, setSchedules] = useState<WeeklySchedule[]>([]);
   const [teacherAssignments, setTeacherAssignments] = useState<TeacherAssignment[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -169,12 +171,26 @@ export default function AdminSchedulePage() {
           time_slot_id: '',
         });
         loadData(false);
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم إضافة الحصة',
+        });
       } else {
         const error = await response.json();
         console.error('Error creating schedule:', error);
+        toast({
+          title: 'خطأ',
+          description: error.error || 'فشل في إضافة الحصة',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error creating schedule:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -195,9 +211,24 @@ export default function AdminSchedulePage() {
         setIsDeleteDialogOpen(false);
         setSelectedSchedule(null);
         loadData(false);
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حذف الحصة',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في حذف الحصة',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error deleting schedule:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -220,9 +251,24 @@ export default function AdminSchedulePage() {
           end_time: '',
         });
         loadData(false);
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم إضافة الفترة الزمنية',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في إضافة الفترة الزمنية',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error creating time slot:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -243,9 +289,24 @@ export default function AdminSchedulePage() {
         setIsDeleteTimeSlotDialogOpen(false);
         setSelectedTimeSlot(null);
         loadData(false);
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حذف الفترة الزمنية',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في حذف الفترة الزمنية',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error deleting time slot:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -431,18 +492,21 @@ export default function AdminSchedulePage() {
 
         {/* Delete Time Slot Confirmation Dialog */}
         <AlertDialog open={isDeleteTimeSlotDialogOpen} onOpenChange={setIsDeleteTimeSlotDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent dir="rtl">
             <AlertDialogHeader>
               <AlertDialogTitle>تأكيد حذف الفترة الزمنية</AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogDescription dir="rtl" className="text-right">
                 هل أنت متأكد من حذف هذه الفترة الزمنية؟
+                <br />
+                لا يمكن التراجع عن هذا الإجراء.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter className="gap-2">
-              <AlertDialogCancel onClick={() => setIsDeleteTimeSlotDialogOpen(false)}>
-                إلغاء
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteTimeSlotConfirm} className="bg-red-500 hover:bg-red-600">
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteTimeSlotConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
                 حذف
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -453,7 +517,7 @@ export default function AdminSchedulePage() {
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogContent className="sm:max-w-[500px] [&>button]:hidden">
             <DialogHeader>
-              <DialogTitle className="text-center">إضافة حصة جديدة</DialogTitle>
+              <DialogTitle className="text-right">إضافة حصة جديدة</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 mt-4">
               <div>
@@ -525,18 +589,21 @@ export default function AdminSchedulePage() {
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent dir="rtl">
             <AlertDialogHeader>
               <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogDescription dir="rtl" className="text-right">
                 هل أنت متأكد من حذف هذه الحصة؟
+                <br />
+                لا يمكن التراجع عن هذا الإجراء.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter className="gap-2">
-              <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
-                إلغاء
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-500 hover:bg-red-600">
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
                 حذف
               </AlertDialogAction>
             </AlertDialogFooter>

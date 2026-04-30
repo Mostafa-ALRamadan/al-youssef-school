@@ -46,14 +46,3 @@ export async function getMobileUser(request: NextRequest): Promise<MobileAuthUse
   if (!token) return null;
   return verifyMobileToken(token);
 }
-
-/**
- * Validate that parent owns the student
- */
-export async function validateParentStudent(parentId: string, studentId: string): Promise<boolean> {
-  const result = await query(
-    'SELECT 1 FROM students WHERE id = $1 AND parent_id = $2',
-    [studentId, parentId]
-  );
-  return result.rows.length > 0;
-}

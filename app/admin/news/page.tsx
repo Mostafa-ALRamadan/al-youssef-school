@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -52,6 +53,7 @@ type News = {
 };
 
 export default function NewsPage() {
+  const { toast } = useToast();
   const [news, setNews] = useState<News[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -255,9 +257,24 @@ export default function NewsPage() {
         setIsAddDialogOpen(false);
         resetForm();
         fetchNews();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم إضافة الخبر',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في إضافة الخبر',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error adding news:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -280,9 +297,24 @@ export default function NewsPage() {
         setSelectedNews(null);
         resetForm();
         fetchNews();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم تحديث الخبر',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في تحديث الخبر',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error updating news:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -299,9 +331,24 @@ export default function NewsPage() {
         setIsDeleteDialogOpen(false);
         setSelectedNews(null);
         fetchNews();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حذف الخبر',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في حذف الخبر',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error deleting news:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -318,9 +365,24 @@ export default function NewsPage() {
 
       if (response.ok) {
         fetchNews();
+        toast({
+          title: 'تم بنجاح',
+          description: newsItem.is_published ? 'تم إلغاء نشر الخبر' : 'تم نشر الخبر',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في تحديث حالة النشر',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error toggling publish:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -337,9 +399,24 @@ export default function NewsPage() {
 
       if (response.ok) {
         fetchNews();
+        toast({
+          title: 'تم بنجاح',
+          description: newsItem.is_pinned ? 'تم إلغاء تثبيت الخبر' : 'تم تثبيت الخبر',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في تحديث حالة التثبيت',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error toggling pin:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -850,18 +927,20 @@ export default function NewsPage() {
 
         {/* Delete Alert Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent dir="rtl">
             <AlertDialogHeader>
-              <AlertDialogTitle>هل أنت متأكد من حذف هذا الخبر؟</AlertDialogTitle>
-              <AlertDialogDescription>
-                سيتم حذف الخبر &quot;{selectedNews?.title}&quot; نهائياً ولا يمكن استرجاعه.
+              <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+              <AlertDialogDescription dir="rtl" className="text-right">
+                هل أنت متأكد من حذف هذا الخبر؟
+                <br />
+                لا يمكن التراجع عن هذا الإجراء.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
               <AlertDialogCancel>إلغاء</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDelete}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 حذف
               </AlertDialogAction>

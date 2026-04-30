@@ -19,7 +19,7 @@ export function UserHeader({ userRole }: UserHeaderProps) {
       <div className="flex items-center gap-4 mr-auto">
         {/* User Profile */}
         <div className="flex items-center gap-3">
-          <div className="hidden md:flex flex-col items-end">
+          <div className="flex flex-col items-end">
             <span className="text-sm font-semibold text-gray-900">
               {userRole === 'admin' ? 'المدير' : (userInfo?.name || userInfo?.email || 'المعلم')}
             </span>

@@ -122,6 +122,11 @@ export default function TeacherPostsPage() {
         }
       } catch (error) {
         console.error('Error fetching teacher data:', error);
+        toast({
+          title: 'خطأ',
+          description: 'فشل في تحميل بيانات المعلم',
+          variant: 'destructive',
+        });
         setLoading(false);
       }
     };
@@ -143,6 +148,11 @@ export default function TeacherPostsPage() {
           }
         } catch (error) {
           console.error('Error fetching assignments:', error);
+          toast({
+            title: 'خطأ',
+            description: 'فشل في تحميل التكليفات',
+            variant: 'destructive',
+          });
         }
       };
       fetchAssignments();
@@ -158,6 +168,11 @@ export default function TeacherPostsPage() {
       }
     } catch (error) {
       console.error('Error fetching posts:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل المنشورات',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -251,6 +266,11 @@ export default function TeacherPostsPage() {
       }
     } catch (error) {
       console.error('Error uploading cropped image:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل الصورة المقصوصة',
+        variant: 'destructive',
+      });
     } finally {
       setUploadingImage(false);
     }
@@ -435,6 +455,16 @@ export default function TeacherPostsPage() {
   
   const openEditDialog = (post: TeacherPost) => {
     setSelectedPost(post);
+    
+    // Auto-detect media type based on post content
+    if (post.video_url && post.video_url.trim() !== '') {
+      setMediaType('video');
+    } else if (post.image_url && post.image_url.trim() !== '') {
+      setMediaType('image');
+    } else {
+      setMediaType('image'); // Default to image if neither exists
+    }
+    
     setFormData({
       title: post.title || '',
       content: post.content,
@@ -778,7 +808,7 @@ export default function TeacherPostsPage() {
                   required
                 >
                   <option value="">اختر الصف</option>
-                  {assignments.map((assignment) => (
+                  {Array.from(new Map(assignments.map(a => [a.class_id, a])).values()).map((assignment) => (
                     <option key={assignment.class_id} value={assignment.class_id}>
                       {assignment.class_name}
                     </option>

@@ -40,14 +40,6 @@ export async function query(text: string, params?: any[]): Promise<QueryResult> 
 }
 
 /**
- * Get a client from the pool for transactions
- * @returns Pool client
- */
-export async function getClient(): Promise<PoolClient> {
-  return await pool.connect();
-}
-
-/**
  * Execute queries within a transaction
  * @param callback - Function that receives client and executes queries
  * @returns Result of the callback

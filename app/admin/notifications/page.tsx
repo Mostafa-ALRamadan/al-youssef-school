@@ -42,6 +42,8 @@ export default function NotificationsAdminPage() {
   const [deletingBulk, setDeletingBulk] = useState(false);
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchNotifications();
@@ -62,17 +64,24 @@ export default function NotificationsAdminPage() {
   };
 
   const deleteNotification = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الإشعار؟')) return;
+    setNotificationToDelete(id);
+    setShowDeleteDialog(true);
+  };
 
-    setDeletingId(id);
+  const handleDeleteConfirm = async () => {
+    if (!notificationToDelete) return;
+
+    setDeletingId(notificationToDelete);
     try {
-      const response = await fetch(`/api/admin/notifications/${id}`, {
+      const response = await fetch(`/api/admin/notifications/${notificationToDelete}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
 
       if (response.ok) {
-        setNotifications(prev => prev.filter(n => n.id !== id));
+        setNotifications(prev => prev.filter(n => n.id !== notificationToDelete));
+        setShowDeleteDialog(false);
+        setNotificationToDelete(null);
       }
     } catch (error) {
       console.error('Error deleting notification:', error);
@@ -367,6 +376,29 @@ export default function NotificationsAdminPage() {
                   {deletingBulk ? 'جاري الحذف...' : 'نعم، حذف المحدد'}
                 </AlertDialogAction>
                 <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Single Delete Confirmation Dialog */}
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogContent dir="rtl">
+              <AlertDialogHeader>
+                <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+                <AlertDialogDescription dir="rtl" className="text-right">
+                  هل أنت متأكد من حذف هذا الإشعار؟
+                  <br />
+                  لا يمكن التراجع عن هذا الإجراء.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteConfirm}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  حذف
+                </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>

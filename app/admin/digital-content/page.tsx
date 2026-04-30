@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { formatDateTimeRTL } from '@/utils/date';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -126,6 +127,7 @@ function SimpleTabsContent({ value, children }: { value: string; children: React
 }
 
 export default function DigitalContentPage() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('about');
   
   // Settings state
@@ -207,9 +209,24 @@ export default function DigitalContentPage() {
       if (response.ok) {
         setSettingsSaved(true);
         setTimeout(() => setSettingsSaved(false), 2000);
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حفظ الإعدادات',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في حفظ الإعدادات',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error saving settings:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
     setSettingsLoading(false);
   };
@@ -273,9 +290,24 @@ export default function DigitalContentPage() {
       if (response.ok) {
         setIsVideoDialogOpen(false);
         fetchVideos();
+        toast({
+          title: 'تم بنجاح',
+          description: selectedVideo ? 'تم تحديث الفيديو' : 'تم إضافة الفيديو',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: selectedVideo ? 'فشل في تحديث الفيديو' : 'فشل في إضافة الفيديو',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error saving video:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -289,9 +321,24 @@ export default function DigitalContentPage() {
       if (response.ok) {
         setIsVideoDeleteDialogOpen(false);
         fetchVideos();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حذف الفيديو',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في حذف الفيديو',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error deleting video:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -346,9 +393,24 @@ export default function DigitalContentPage() {
         setCodeCount(1);
         setCodeClassId('');
         setCodeExpiresAt('');
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم إنشاء رموز الوصول',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في إنشاء رموز الوصول',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error generating codes:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -362,9 +424,24 @@ export default function DigitalContentPage() {
       if (response.ok) {
         setIsCodeDeleteDialogOpen(false);
         fetchCodes();
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم حذف رمز الوصول',
+        });
+      } else {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في حذف رمز الوصول',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error deleting code:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -729,18 +806,21 @@ export default function DigitalContentPage() {
 
         {/* Video Delete Alert */}
         <AlertDialog open={isVideoDeleteDialogOpen} onOpenChange={setIsVideoDeleteDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent dir="rtl">
             <AlertDialogHeader>
-              <AlertDialogTitle>حذف الفيديو</AlertDialogTitle>
-              <AlertDialogDescription>
-                هل أنت متأكد من حذف هذا الفيديو؟ لا يمكن التراجع عن هذا الإجراء.
+              <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+              <AlertDialogDescription dir="rtl" className="text-right">
+                هل أنت متأكد من حذف هذا الفيديو؟
+                <br />
+                لا يمكن التراجع عن هذا الإجراء.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setIsVideoDeleteDialogOpen(false)}>
-                إلغاء
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteVideo} className="bg-red-500 hover:bg-red-600">
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteVideo}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
                 حذف
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -749,18 +829,21 @@ export default function DigitalContentPage() {
 
         {/* Code Delete Alert */}
         <AlertDialog open={isCodeDeleteDialogOpen} onOpenChange={setIsCodeDeleteDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent dir="rtl">
             <AlertDialogHeader>
-              <AlertDialogTitle>حذف الكود</AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+              <AlertDialogDescription dir="rtl" className="text-right">
                 هل أنت متأكد من حذف كود الوصول هذا؟
+                <br />
+                لا يمكن التراجع عن هذا الإجراء.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setIsCodeDeleteDialogOpen(false)}>
-                إلغاء
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteCode} className="bg-red-500 hover:bg-red-600">
+            <AlertDialogFooter className="flex-row-reverse justify-start gap-2">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteCode}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
                 حذف
               </AlertDialogAction>
             </AlertDialogFooter>

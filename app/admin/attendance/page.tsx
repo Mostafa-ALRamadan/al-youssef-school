@@ -73,6 +73,11 @@ export default function AdminAttendancePage() {
       }
     } catch (error) {
       console.error('Error loading semesters:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل الفصول الدراسية',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -91,6 +96,11 @@ export default function AdminAttendancePage() {
       }
     } catch (error) {
       console.error('Error loading classes:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل الصفوف',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

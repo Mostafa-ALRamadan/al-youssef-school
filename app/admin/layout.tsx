@@ -1,4 +1,5 @@
 import RoleGuard from '@/components/auth/RoleGuard';
+import { Toaster } from '@/components/ui/toaster';
 
 export default function AdminLayout({
   children,
@@ -8,6 +9,7 @@ export default function AdminLayout({
   return (
     <RoleGuard allowedRoles={['admin']}>
       {children}
+      <Toaster />
     </RoleGuard>
   );
 }

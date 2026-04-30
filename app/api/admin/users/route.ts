@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { createAuthUser, deleteAuthUser, updateAuthUser, getCurrentUser } from '@/lib/auth';
+import { createAuthUser, deleteAuthUser, updateAuthUser, getCurrentUser, verifyToken } from '@/lib/auth';
 
 // GET /api/admin/users - Get all users with role-specific details
 export async function GET(request: NextRequest) {

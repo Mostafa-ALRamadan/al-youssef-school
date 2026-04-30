@@ -58,6 +58,11 @@ export default function TeacherGradesPage() {
       }
     } catch (error) {
       console.error('Error loading exams:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل الامتحانات',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -84,6 +89,11 @@ export default function TeacherGradesPage() {
       }
     } catch (error) {
       console.error('Error loading classes and subjects:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل الصفوف والمواد',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -99,6 +109,11 @@ export default function TeacherGradesPage() {
       }
     } catch (error) {
       console.error('Error loading students:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل الطلاب',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -191,6 +206,11 @@ export default function TeacherGradesPage() {
       }
     } catch (error) {
       console.error('Error loading grades:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل الدرجات',
+        variant: 'destructive',
+      });
     }
   };
 
