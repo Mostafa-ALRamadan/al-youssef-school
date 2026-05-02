@@ -97,10 +97,8 @@ export default function TeacherEvaluationsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
-  // Filter students based on selected student filter
-  const filteredStudents = selectedStudent
-    ? students.filter(s => s.id === selectedStudent)
-    : students;
+  // Show all students (no filtering based on selection)
+  const filteredStudents = students;
 
   // Pagination logic for students
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);

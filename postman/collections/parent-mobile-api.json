@@ -24,11 +24,11 @@
               "raw": "{\n  \"login_name\": \"طفلك الاول\",\n  \"password\": \"parent_password\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/auth/parent-login",
+              "raw": "{{base_url}}/api/mobile/parent-login",
               "host": ["{{base_url}}"],
-              "path": ["api", "auth", "parent-login"]
+              "path": ["api", "mobile", "parent-login"]
             },
-            "description": "Login with parent's login_name and password. Returns JWT token."
+            "description": "Login with child's login_name and parent password. Returns JWT token, parent info and ALL children."
           },
           "response": [
             {
@@ -41,7 +41,7 @@
                   "raw": "{\n  \"login_name\": \"طفلك الاول\",\n  \"password\": \"parent_password\"\n}"
                 },
                 "url": {
-                  "raw": "{{base_url}}/api/auth/parent-login"
+                  "raw": "{{base_url}}/api/mobile/parent-login"
                 }
               },
               "status": "OK",

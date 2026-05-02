@@ -403,8 +403,12 @@ export default function StudentsPage() {
     uploadFormData.append('filename', arabicFilename);
 
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch('/api/upload', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: uploadFormData,
       });
 
@@ -414,9 +418,25 @@ export default function StudentsPage() {
         setIsCropping(false);
         setImageFile(null);
         setImagePreview('');
+        toast({
+          title: 'تم بنجاح',
+          description: 'تم رفع الصورة',
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: 'خطأ',
+          description: error.error || 'فشل في رفع الصورة',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Upload error:', error);
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
     }
   };
 
